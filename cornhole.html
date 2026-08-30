@@ -99,7 +99,7 @@
     4 bags each per round. Board = 1, hole = 3 — only the round's difference is awarded. First to 21 wins.
   </div>
 
-  <div id="appVersion">v1.1.4</div>
+  <div id="appVersion">v1.1.5</div>
 </div>
 
 <script src="shared.js"></script>
@@ -294,13 +294,25 @@
   function render(){
     ctx.clearRect(0,0,CW,CH);
 
-    // ground
-    const ground = ctx.createLinearGradient(0,0,0,CH);
-    ground.addColorStop(0,'#3d5a34'); ground.addColorStop(1,'#24371f');
-    ctx.fillStyle = ground; ctx.fillRect(0,0,CW,CH);
+    // outer rail (matches Corner Pocket's rail gradient)
+    const rail = ctx.createLinearGradient(0,0,0,CH);
+    rail.addColorStop(0,'#5a3d24'); rail.addColorStop(1,'#33220f');
+    ctx.fillStyle = rail; ctx.fillRect(0,0,CW,CH);
+    ctx.strokeStyle = 'rgba(212,175,106,0.18)';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(3,3,CW-6,CH-6);
 
-    // lane guide lines (cosmetic)
-    ctx.strokeStyle = 'rgba(255,255,255,0.06)';
+    // field — felt green, matching Corner Pocket's table instead of literal grass
+    const ground = ctx.createRadialGradient(CW/2,CH*0.4,20, CW/2,CH*0.4,CH*0.9);
+    ground.addColorStop(0,'#1a7d4a'); ground.addColorStop(1,'#0d5232');
+    ctx.fillStyle = ground;
+    ctx.fillRect(LANE_LEFT-10, 6, (LANE_RIGHT-LANE_LEFT)+20, CH-12);
+    ctx.strokeStyle = 'rgba(0,0,0,0.25)';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(LANE_LEFT-10, 6, (LANE_RIGHT-LANE_LEFT)+20, CH-12);
+
+    // lane guide lines (cosmetic, gold-tinted to match the rest of the app)
+    ctx.strokeStyle = 'rgba(212,175,106,0.35)';
     ctx.lineWidth = 1;
     ctx.beginPath(); ctx.moveTo(LANE_LEFT,0); ctx.lineTo(LANE_LEFT,CH); ctx.stroke();
     ctx.beginPath(); ctx.moveTo(LANE_RIGHT,0); ctx.lineTo(LANE_RIGHT,CH); ctx.stroke();

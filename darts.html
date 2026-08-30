@@ -107,7 +107,7 @@
     bullseye). Overshoot, land on 1, or reach 0 without a double, and the whole turn is voided.
   </div>
 
-  <div id="appVersion">v1.1.4</div>
+  <div id="appVersion">v1.1.5</div>
 </div>
 
 <script src="shared.js"></script>
@@ -409,9 +409,18 @@
     const wood = ctx.createRadialGradient(CX,CY,10,CX,CY,R*1.35);
     wood.addColorStop(0,'#3a2a18'); wood.addColorStop(1,'#1a1209');
     ctx.fillStyle = wood; ctx.fillRect(0,0,CW,CH);
+    ctx.strokeStyle = 'rgba(212,175,106,0.16)';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(3,3,CW-6,CH-6);
 
     ctx.save();
     ctx.translate(CX, CY);
+
+    // decorative gold bezel just outside the board — cosmetic only, doesn't affect scoring
+    ctx.beginPath(); ctx.arc(0,0,R*DOUBLE_OUTER+9,0,Math.PI*2);
+    ctx.strokeStyle = 'rgba(212,175,106,0.5)';
+    ctx.lineWidth = 2.5;
+    ctx.stroke();
 
     // board backing
     ctx.beginPath(); ctx.arc(0,0,R*DOUBLE_OUTER+6,0,Math.PI*2);

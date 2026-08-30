@@ -1,9 +1,9 @@
 // Corner Pocket Arcade — service worker
 //
 // IMPORTANT: bump CACHE_NAME every time you push a new version (keep it in sync
-// with the "v1.1.4" shown at the bottom of every page). Changing this string is
+// with the "v1.1.5" shown at the bottom of every page). Changing this string is
 // what tells the service worker "this is new content, throw out the old cache."
-const CACHE_NAME = 'corner-pocket-arcade-v1.1.4';
+const CACHE_NAME = 'corner-pocket-arcade-v1.1.5';
 
 const CORE_ASSETS = [
   './',

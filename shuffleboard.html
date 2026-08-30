@@ -99,7 +99,7 @@
     4 pucks each per end. Only the closer player's leading pucks score. First to 21 wins.
   </div>
 
-  <div id="appVersion">v1.1.4</div>
+  <div id="appVersion">v1.1.5</div>
 </div>
 
 <script src="shared.js"></script>
@@ -432,18 +432,35 @@
   function render(){
     ctx.clearRect(0,0,CW,CH);
 
-    // lane background
+    // outer rail (matches Corner Pocket's rail gradient)
     const wood = ctx.createLinearGradient(0,0,0,CH);
     wood.addColorStop(0,'#5a3d24'); wood.addColorStop(1,'#33220f');
     ctx.fillStyle = wood; ctx.fillRect(0,0,CW,CH);
+    ctx.strokeStyle = 'rgba(212,175,106,0.18)';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(3,3,CW-6,CH-6);
 
-    const lane = ctx.createLinearGradient(0,0,0,CH);
-    lane.addColorStop(0,'#caa15a'); lane.addColorStop(1,'#a97e3c');
+    // lane — lacquered wood with a lengthwise sheen, like a real waxed shuffleboard court
+    const lane = ctx.createLinearGradient(LANE_LEFT,0,LANE_RIGHT,0);
+    lane.addColorStop(0,'#8a6530'); lane.addColorStop(0.5,'#caa15a'); lane.addColorStop(1,'#8a6530');
     ctx.fillStyle = lane;
     ctx.fillRect(LANE_LEFT, 0, LANE_RIGHT-LANE_LEFT, CH);
 
+    const sheen = ctx.createLinearGradient(0,0,0,CH);
+    sheen.addColorStop(0,'rgba(255,255,255,0.16)');
+    sheen.addColorStop(0.4,'rgba(255,255,255,0.03)');
+    sheen.addColorStop(1,'rgba(0,0,0,0.10)');
+    ctx.fillStyle = sheen;
+    ctx.fillRect(LANE_LEFT, 0, LANE_RIGHT-LANE_LEFT, CH);
+
+    // gold trim lines along the lane edges
+    ctx.strokeStyle = 'rgba(212,175,106,0.55)';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.moveTo(LANE_LEFT,0); ctx.lineTo(LANE_LEFT,CH); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(LANE_RIGHT,0); ctx.lineTo(LANE_RIGHT,CH); ctx.stroke();
+
     // gutters (visual only)
-    ctx.fillStyle = 'rgba(0,0,0,0.35)';
+    ctx.fillStyle = 'rgba(0,0,0,0.4)';
     ctx.fillRect(LANE_LEFT-14, 0, 14, CH);
     ctx.fillRect(LANE_RIGHT, 0, 14, CH);
 
