@@ -11,6 +11,23 @@
 <meta name="apple-mobile-web-app-title" content="Shuffleboard">
 <meta name="theme-color" content="#0d0b09">
 <link rel="stylesheet" href="shared.css">
+<style>
+  /* Tightened spacing (page-specific, doesn't affect other games) so the whole
+     board + every control fits on one screen with no scrolling required. */
+  header { margin-bottom: 4px; }
+  .stats-bar { margin-bottom: 6px; }
+  .stat-chip { padding: 5px 4px; }
+  .stat-chip .num { font-size: 15px; }
+  .scoreboard { margin-bottom: 6px; }
+  .score-panel { padding: 6px 10px; }
+  #message { margin-top: 6px; font-size: 12px; min-height: 14px; }
+  #powerWrap { margin-top: 6px; }
+  #aimPadWrap { margin-top: 8px; }
+  #aimPad { max-width: 120px; max-height: 120px; min-width: 100px; min-height: 100px; }
+  #aimPadLabel { margin-top: 4px; font-size: 10.5px; }
+  .help { margin-top: 8px; font-size: 10px; line-height: 1.4; }
+  #appVersion { margin-top: 6px; }
+</style>
 </head>
 <body>
 <div id="app">
@@ -62,7 +79,7 @@
   </div>
 
   <div id="tableWrap">
-    <canvas id="table" width="360" height="500"></canvas>
+    <canvas id="table" width="360" height="260"></canvas>
     <div id="overlay">
       <h2 id="overlayTitle">Game Over</h2>
       <p id="overlayText">Details here</p>
@@ -75,15 +92,14 @@
 
   <div id="aimPadWrap">
     <div id="aimPad"><div id="aimKnob"></div></div>
-    <div id="aimPadLabel">Pull back, release to slide your puck up the lane</div>
+    <div id="aimPadLabel">Pull back, release to slide</div>
   </div>
 
   <div class="help">
-    4 pucks each per end. Only the player with the closest-to-the-far-edge puck scores —
-    and only for each of their own pucks that beats the opponent's best. First to 21 wins the match.
+    4 pucks each per end. Only the closer player's leading pucks score. First to 21 wins.
   </div>
 
-  <div id="appVersion">v1.1.0</div>
+  <div id="appVersion">v1.1.2</div>
 </div>
 
 <script src="shared.js"></script>
@@ -92,21 +108,21 @@
   "use strict";
 
   // ---------- CONFIG ----------
-  const CW = 360, CH = 500;
+  const CW = 360, CH = 260;
   const LANE_LEFT = 64, LANE_RIGHT = CW - 64;
   const PUCK_R = 13;
   const FRICTION = 0.99;
   const STOP_SPEED = 0.05;
-  const MAX_SPEED = 7;
+  const MAX_SPEED = 4;
 
-  const LANE_START_Y = 460;   // where a fresh puck is placed to be shot
-  const BOTTOM_DEAD_Y = 489;  // knocked back past here = off the near end
-  const FOUL_LINE_Y = 400;    // must cross this to score anything
-  const ZONE1_END_Y = 329;    // [329,400) = zone 1
-  const ZONE2_END_Y = 257;    // [257,329) = zone 2
-  const ZONE3_END_Y = 186;    // [186,257) = zone 3
-  const ZONE4_END_Y = 107;    // [107,186) = zone 4 ("hanging")
-  const OFF_EDGE_Y = 107;     // below this = fell off the far edge
+  const LANE_START_Y = 240;   // where a fresh puck is placed to be shot
+  const BOTTOM_DEAD_Y = 252;  // knocked back past here = off the near end
+  const FOUL_LINE_Y = 205;    // must cross this to score anything
+  const ZONE1_END_Y = 170;    // [170,205) = zone 1
+  const ZONE2_END_Y = 135;    // [135,170) = zone 2
+  const ZONE3_END_Y = 100;    // [100,135) = zone 3
+  const ZONE4_END_Y = 58;     // [58,100) = zone 4 ("hanging")
+  const OFF_EDGE_Y = 58;      // below this = fell off the far edge
 
   const WIN_SCORE = 21;
 
@@ -341,7 +357,7 @@
   function aiTakeShot(){
     if(gameOver) return;
     const diff = difficultySel.value;
-    const errorPx = diff==='easy' ? 30 : diff==='hard' ? 5 : 14;
+    const errorPx = diff==='easy' ? 15 : diff==='hard' ? 3 : 7;
     const powerNoise = diff==='easy' ? 0.20 : diff==='hard' ? 0.04 : 0.11;
 
     // figure out if the opponent currently holds the lead and is worth knocking
@@ -355,7 +371,7 @@
       target = { x: alive[0].p.x, y: alive[0].p.y - 8 }; // aim slightly past its center for a clean hit through
     } else {
       // lay up in the best zone (aim for the hang zone, with a little room to spare)
-      target = { x: laneCenterX() + (Math.random()*2-1)*14, y: ZONE4_END_Y + 40 };
+      target = { x: laneCenterX() + (Math.random()*2-1)*14, y: ZONE4_END_Y + 20 };
     }
 
     target.x += (Math.random()*2-1) * errorPx;
