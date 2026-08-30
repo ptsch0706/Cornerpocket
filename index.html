@@ -392,6 +392,13 @@
     text-align: center;
     padding: 0 6px;
   }
+  #appVersion {
+    margin-top: 12px;
+    font-size: 10px;
+    color: #4a4232;
+    text-align: center;
+    letter-spacing: 0.4px;
+  }
 </style>
 </head>
 <body>
@@ -477,6 +484,8 @@
     Solids vs. stripes. Sink your own group's balls to keep your turn, then pocket the 8-ball last to win.
     Potting the cue ball or the 8-ball early costs you the game.
   </div>
+
+  <div id="appVersion">v0.0.1</div>
 </div>
 
 <script>
@@ -1308,6 +1317,21 @@
   startGame();
   requestAnimationFrame(loop);
 })();
+</script>
+
+<script>
+  // ---------- Service worker: keeps the installed/Home-Screen app up to date ----------
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('sw.js').catch(() => {});
+    });
+    let swRefreshing = false;
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      if (swRefreshing) return;
+      swRefreshing = true;
+      window.location.reload();
+    });
+  }
 </script>
 </body>
 </html>
