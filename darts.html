@@ -1,0 +1,433 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>Darts — Corner Pocket Arcade</title>
+<link rel="icon" type="image/png" href="Cornerpocket.PNG">
+<link rel="apple-touch-icon" href="Cornerpocket.PNG">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Darts">
+<meta name="theme-color" content="#0d0b09">
+<link rel="stylesheet" href="shared.css">
+<style>
+  .darts-pips { display:flex; gap:5px; margin-top:2px; }
+  .darts-pips .pip {
+    width:7px; height:7px; border-radius:50%;
+    background:#3a3327; border:1px solid #5c4a30;
+  }
+  .darts-pips .pip.used { background:#d4af6a; border-color:#a9853c; }
+  .score-panel .big { font-size:22px; font-weight:700; color:#e9d9a8; line-height:1.1; margin-top:2px; }
+</style>
+</head>
+<body>
+<div id="app">
+  <a class="icon-btn fixed-corner left" href="index.html" aria-label="Back to arcade">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M15 5l-7 7 7 7" stroke="#e9d9a8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+  </a>
+  <button class="icon-btn fixed-corner right" id="settingsBtn" aria-label="Settings">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Z" stroke="#e9d9a8" stroke-width="1.6"/>
+      <path d="M19.4 13.5c.04-.33.06-.66.06-1s-.02-.67-.06-1l2.02-1.58a.5.5 0 0 0 .12-.64l-1.92-3.32a.5.5 0 0 0-.6-.22l-2.38.96a7.4 7.4 0 0 0-1.73-1l-.36-2.53a.5.5 0 0 0-.5-.42h-3.84a.5.5 0 0 0-.5.42l-.36 2.53a7.4 7.4 0 0 0-1.73 1l-2.38-.96a.5.5 0 0 0-.6.22L2.62 9.28a.5.5 0 0 0 .12.64L4.76 11.5c-.04.33-.06.66-.06 1s.02.67.06 1L2.74 15.08a.5.5 0 0 0-.12.64l1.92 3.32a.5.5 0 0 0 .6.22l2.38-.96c.53.43 1.11.77 1.73 1l.36 2.53a.5.5 0 0 0 .5.42h3.84a.5.5 0 0 0 .5-.42l.36-2.53a7.4 7.4 0 0 0 1.73-1l2.38.96a.5.5 0 0 0 .6-.22l1.92-3.32a.5.5 0 0 0-.12-.64L19.4 13.5Z" stroke="#e9d9a8" stroke-width="1.5" stroke-linejoin="round"/>
+    </svg>
+  </button>
+
+  <header><h1>Darts — 501</h1></header>
+
+  <div class="stats-bar">
+    <div class="stat-chip wins"><span class="num" id="statWins">0</span><span class="lbl">Wins</span></div>
+    <div class="stat-chip losses"><span class="num" id="statLosses">0</span><span class="lbl">Losses</span></div>
+    <div class="stat-chip rate"><span class="num" id="statRate">—</span><span class="lbl">Win Rate</span></div>
+  </div>
+
+  <div id="settingsModal">
+    <div id="settingsModalCard">
+      <div class="settingsModalHeader">
+        <span>Settings</span>
+        <button id="settingsCloseBtn" aria-label="Close">&times;</button>
+      </div>
+      <label for="difficulty">Computer skill</label>
+      <select id="difficulty">
+        <option value="easy">Easy</option>
+        <option value="medium" selected>Medium</option>
+        <option value="hard">Hard</option>
+      </select>
+      <button id="resetStats">Reset record</button>
+    </div>
+  </div>
+
+  <div class="scoreboard">
+    <div class="score-panel" id="playerPanel">
+      <span class="who"><span class="dot"></span>YOU</span>
+      <div class="big" id="playerRemaining">501</div>
+      <div class="darts-pips" id="playerPips"><span class="pip"></span><span class="pip"></span><span class="pip"></span></div>
+    </div>
+    <div class="score-panel" id="aiPanel">
+      <span class="who"><span class="dot"></span>COMPUTER</span>
+      <div class="big" id="aiRemaining">501</div>
+      <div class="darts-pips" id="aiPips"><span class="pip"></span><span class="pip"></span><span class="pip"></span></div>
+    </div>
+  </div>
+
+  <div id="tableWrap">
+    <canvas id="table" width="460" height="460"></canvas>
+    <div id="overlay">
+      <h2 id="overlayTitle">Game Over</h2>
+      <p id="overlayText">Details here</p>
+      <button class="primary" onclick="startMatch()">Play Again</button>
+    </div>
+  </div>
+
+  <div id="message">Loading...</div>
+  <div id="powerWrap"><div id="powerBar"></div></div>
+
+  <div id="aimPadWrap">
+    <div id="aimPad"><div id="aimKnob"></div></div>
+    <div id="aimPadLabel">Drag toward where you want to throw — release to let go</div>
+  </div>
+
+  <div class="help">
+    Standard 501: start at 501, first to exactly 0 wins — but your very last dart must land on a
+    double (or the bullseye). Overshoot, land on 1, or reach 0 without a double, and the whole
+    turn's score is voided.
+  </div>
+
+  <div id="appVersion">v1.0.1</div>
+</div>
+
+<script src="shared.js"></script>
+<script>
+(function(){
+  "use strict";
+
+  // ---------- BOARD GEOMETRY ----------
+  const CW = 460, CH = 460;
+  const CX = CW/2, CY = CH/2;
+  const R = 195; // outer double-ring radius, in px
+
+  const DOUBLE_OUTER = 1.00, DOUBLE_INNER = 0.92;
+  const TREBLE_OUTER = 0.62, TREBLE_INNER = 0.56;
+  const OUTER_BULL = 0.10, INNER_BULL = 0.045;
+  const SINGLE_OUTER_MID = (TREBLE_OUTER + DOUBLE_INNER) / 2;
+
+  const SECTOR_ORDER = [20,1,18,4,13,6,10,15,2,17,3,19,7,16,8,11,14,9,12,5];
+  const SECTOR_WIDTH_DEG = 18;
+  const TOP_CENTER_DEG = 270; // "up" in atan2(dy,dx) terms, y-down canvas
+
+  function sectorIndexForAngleDeg(deg){
+    const shifted = ((deg - (TOP_CENTER_DEG - SECTOR_WIDTH_DEG/2)) % 360 + 360) % 360;
+    return Math.floor(shifted / SECTOR_WIDTH_DEG) % 20;
+  }
+  function sectorCenterDeg(N){
+    const idx = SECTOR_ORDER.indexOf(N);
+    return TOP_CENTER_DEG + idx * SECTOR_WIDTH_DEG;
+  }
+  function pointForRingSector(ringFrac, N){
+    const deg = sectorCenterDeg(N);
+    const rad = deg * Math.PI/180;
+    return { dx: Math.cos(rad)*R*ringFrac, dy: Math.sin(rad)*R*ringFrac };
+  }
+  function trebleTarget(N){ return pointForRingSector((TREBLE_INNER+TREBLE_OUTER)/2, N); }
+  function doubleTarget(N){ return pointForRingSector((DOUBLE_INNER+DOUBLE_OUTER)/2, N); }
+  function singleTarget(N){ return pointForRingSector(SINGLE_OUTER_MID, N); }
+  function bullTarget(){ return { dx: 0, dy: 0 }; }
+
+  /** Score a throw given (dx,dy) offset from board center, in px. */
+  function scoreForPoint(dx, dy){
+    const d = Math.hypot(dx, dy);
+    if(d > R * DOUBLE_OUTER) return { value: 0, label: 'Miss', isDouble: false };
+    if(d <= R * INNER_BULL) return { value: 50, label: 'Bullseye', isDouble: true };
+    if(d <= R * OUTER_BULL) return { value: 25, label: 'Outer Bull', isDouble: false };
+    const deg = (Math.atan2(dy, dx) * 180/Math.PI + 360) % 360;
+    const idx = sectorIndexForAngleDeg(deg);
+    const N = SECTOR_ORDER[idx];
+    if(d <= R*DOUBLE_OUTER && d > R*DOUBLE_INNER) return { value: N*2, label: `Double ${N}`, isDouble: true };
+    if(d <= R*TREBLE_OUTER && d > R*TREBLE_INNER) return { value: N*3, label: `Treble ${N}`, isDouble: false };
+    return { value: N, label: `Single ${N}`, isDouble: false };
+  }
+
+  // ---------- STATS ----------
+  const stats = Arcade.createStats('darts_stats_v1');
+  const statWinsEl = document.getElementById('statWins');
+  const statLossesEl = document.getElementById('statLosses');
+  const statRateEl = document.getElementById('statRate');
+  function renderStats(){ stats.render(statWinsEl, statLossesEl, statRateEl); }
+  document.getElementById('resetStats').addEventListener('click', () => {
+    if(confirm('Reset your win/loss record?')){ stats.reset(); renderStats(); }
+  });
+  renderStats();
+  Arcade.wireSettingsModal('settingsBtn', 'settingsModal', 'settingsCloseBtn');
+
+  // ---------- STATE ----------
+  let remaining = { player: 501, ai: 501 };
+  let turn = 'player';
+  let turnStartRemaining = 501;
+  let dartsThisTurn = 0;
+  let turnMarks = []; // {dx,dy} landing points thrown this turn, for display
+  let state = 'aiming'; // 'aiming' | 'ai-wait' | 'over'
+  let gameOver = false;
+
+  const canvas = document.getElementById('table');
+  const ctx = canvas.getContext('2d');
+  const messageEl = document.getElementById('message');
+  const powerBar = document.getElementById('powerBar');
+  const overlay = document.getElementById('overlay');
+  const overlayTitle = document.getElementById('overlayTitle');
+  const overlayText = document.getElementById('overlayText');
+  const playerPanel = document.getElementById('playerPanel');
+  const aiPanel = document.getElementById('aiPanel');
+  const playerRemainingEl = document.getElementById('playerRemaining');
+  const aiRemainingEl = document.getElementById('aiRemaining');
+  const playerPips = document.getElementById('playerPips').children;
+  const aiPips = document.getElementById('aiPips').children;
+  const difficultySel = document.getElementById('difficulty');
+  const aimPad = document.getElementById('aimPad');
+  const aimKnob = document.getElementById('aimKnob');
+
+  function setMessage(t){ messageEl.textContent = t; }
+
+  function startMatch(){
+    remaining = { player: 501, ai: 501 };
+    gameOver = false;
+    overlay.style.display = 'none';
+    turn = Math.random() < 0.5 ? 'player' : 'ai';
+    beginTurn();
+  }
+
+  function beginTurn(){
+    dartsThisTurn = 0;
+    turnMarks = [];
+    turnStartRemaining = remaining[turn];
+    updateScoreDisplays();
+    updatePanels();
+    if(turn === 'player'){
+      state = 'aiming';
+      setMessage("Your throw — drag toward your target.");
+    } else {
+      state = 'ai-wait';
+      setMessage("Computer is throwing...");
+      setTimeout(aiThrowDart, 750);
+    }
+    render();
+  }
+
+  // ---------- AIM PAD (direct aim-offset convention, not pull-back) ----------
+  const MAX_OFFSET = R * 1.15; // dragging to full power can throw slightly off the board
+  function canShoot(){
+    return turn === 'player' && state === 'aiming' && !gameOver;
+  }
+  Arcade.createAimPad({
+    padEl: aimPad, knobEl: aimKnob, powerBarEl: powerBar,
+    canShoot: canShoot,
+    onRelease: (dx, dy, power) => {
+      throwDart(dx * power * MAX_OFFSET, dy * power * MAX_OFFSET);
+    }
+  });
+
+  function throwDart(dx, dy){
+    const result = scoreForPoint(dx, dy);
+    turnMarks.push({ dx, dy });
+    applyThrow(result);
+  }
+
+  function applyThrow(result){
+    const before = remaining[turn];
+    const after = before - result.value;
+    let bust = false;
+    if(after < 0) bust = true;
+    else if(after === 1) bust = true;
+    else if(after === 0 && !result.isDouble) bust = true;
+
+    dartsThisTurn++;
+
+    if(bust){
+      remaining[turn] = turnStartRemaining;
+      updateScoreDisplays();
+      setMessage(`${turn === 'player' ? 'You' : 'Computer'} threw ${result.label} — BUST! Score reverts to ${turnStartRemaining}.`);
+      render();
+      setTimeout(() => endTurn(), 1300);
+      return;
+    }
+
+    remaining[turn] = after;
+    updateScoreDisplays();
+    updatePips();
+    render();
+
+    if(after === 0){
+      setMessage(`${turn === 'player' ? 'You' : 'Computer'} checked out with ${result.label}!`);
+      setTimeout(() => endGame(turn), 900);
+      return;
+    }
+
+    setMessage(`${turn === 'player' ? 'You' : 'Computer'} threw ${result.label}.`);
+
+    if(dartsThisTurn >= 3){
+      setTimeout(() => endTurn(), 900);
+    } else if(turn === 'ai'){
+      setTimeout(aiThrowDart, 750);
+    }
+    // if it's the player's turn with darts remaining, they just release the pad again
+  }
+
+  function endTurn(){
+    turn = (turn === 'player') ? 'ai' : 'player';
+    beginTurn();
+  }
+
+  function endGame(winner){
+    gameOver = true;
+    state = 'over';
+    overlay.style.display = 'flex';
+    overlayTitle.textContent = winner === 'player' ? "You Win" : "Computer Wins";
+    overlayText.textContent = winner === 'player' ? "Checked out — nicely played." : "The computer checked out first.";
+    if(winner === 'player') stats.addWin(); else stats.addLoss();
+    renderStats();
+    updatePanels();
+  }
+
+  function updateScoreDisplays(){
+    playerRemainingEl.textContent = remaining.player;
+    aiRemainingEl.textContent = remaining.ai;
+  }
+  function updatePips(){
+    const pips = turn === 'player' ? playerPips : aiPips;
+    for(let i=0;i<3;i++) pips[i].classList.toggle('used', i < dartsThisTurn);
+  }
+  function updatePanels(){
+    playerPanel.classList.toggle('active', turn === 'player' && !gameOver);
+    aiPanel.classList.toggle('active', turn === 'ai' && !gameOver);
+    for(let i=0;i<3;i++){
+      playerPips[i].classList.remove('used');
+      aiPips[i].classList.remove('used');
+    }
+  }
+
+  // ---------- AI ----------
+  function aiTargetFor(rem){
+    if(rem === 50) return bullTarget();
+    if(rem <= 40 && rem % 2 === 0 && rem > 0) return doubleTarget(rem/2);
+    if(rem <= 40 && rem % 2 === 1){
+      // odd & in finishing range: tap a single 1 to make it even, sets up a double next dart
+      return singleTarget(1);
+    }
+    return trebleTarget(20); // default: maximize scoring until in range to finish
+  }
+
+  function aiThrowDart(){
+    if(gameOver) return;
+    const diff = difficultySel.value;
+    const jitterPx = diff==='easy' ? 34 : diff==='hard' ? 7 : 17;
+
+    const base = aiTargetFor(remaining.ai);
+    const angle = Math.random() * Math.PI * 2;
+    const rad = Math.random() * jitterPx;
+    const dx = base.dx + Math.cos(angle)*rad;
+    const dy = base.dy + Math.sin(angle)*rad;
+
+    turnMarks.push({ dx, dy });
+    render();
+    applyThrow(scoreForPoint(dx, dy));
+  }
+
+  // ---------- RENDER ----------
+  function wedge(rInner, rOuter, startDeg, endDeg, color){
+    const s = startDeg*Math.PI/180, e = endDeg*Math.PI/180;
+    ctx.beginPath();
+    ctx.arc(0,0, rOuter, s, e);
+    ctx.arc(0,0, rInner, e, s, true);
+    ctx.closePath();
+    ctx.fillStyle = color;
+    ctx.fill();
+  }
+
+  function render(){
+    ctx.clearRect(0,0,CW,CH);
+
+    // cabinet background
+    const wood = ctx.createRadialGradient(CX,CY,10,CX,CY,R*1.35);
+    wood.addColorStop(0,'#3a2a18'); wood.addColorStop(1,'#1a1209');
+    ctx.fillStyle = wood; ctx.fillRect(0,0,CW,CH);
+
+    ctx.save();
+    ctx.translate(CX, CY);
+
+    // board backing
+    ctx.beginPath(); ctx.arc(0,0,R*DOUBLE_OUTER+6,0,Math.PI*2);
+    ctx.fillStyle = '#0c0c0c'; ctx.fill();
+
+    for(let i=0;i<20;i++){
+      const N = SECTOR_ORDER[i];
+      const centerDeg = TOP_CENTER_DEG + i*SECTOR_WIDTH_DEG;
+      const startDeg = centerDeg - SECTOR_WIDTH_DEG/2, endDeg = centerDeg + SECTOR_WIDTH_DEG/2;
+      const dark = i % 2 === 0;
+      const singleColor = dark ? '#141414' : '#e9d9a8';
+      const bandColor = dark ? '#8f1f1f' : '#155c34';
+
+      wedge(TREBLE_OUTER*R, DOUBLE_INNER*R, startDeg, endDeg, singleColor);
+      wedge(DOUBLE_INNER*R, DOUBLE_OUTER*R, startDeg, endDeg, bandColor);
+      wedge(OUTER_BULL*R, TREBLE_INNER*R, startDeg, endDeg, singleColor);
+      wedge(TREBLE_INNER*R, TREBLE_OUTER*R, startDeg, endDeg, bandColor);
+
+      // sector divider line
+      const rad = startDeg*Math.PI/180;
+      ctx.strokeStyle = 'rgba(0,0,0,0.5)'; ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(Math.cos(rad)*OUTER_BULL*R, Math.sin(rad)*OUTER_BULL*R);
+      ctx.lineTo(Math.cos(rad)*DOUBLE_OUTER*R, Math.sin(rad)*DOUBLE_OUTER*R);
+      ctx.stroke();
+
+      // number label
+      const labelRad = (centerDeg)*Math.PI/180;
+      const lx = Math.cos(labelRad)*R*1.09, ly = Math.sin(labelRad)*R*1.09;
+      ctx.fillStyle = '#e9d9a8';
+      ctx.font = 'bold 15px sans-serif';
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText(String(N), lx, ly);
+    }
+
+    // bulls
+    ctx.beginPath(); ctx.arc(0,0,OUTER_BULL*R,0,Math.PI*2); ctx.fillStyle = '#155c34'; ctx.fill();
+    ctx.beginPath(); ctx.arc(0,0,INNER_BULL*R,0,Math.PI*2); ctx.fillStyle = '#8f1f1f'; ctx.fill();
+
+    // ring boundary strokes for clarity
+    ctx.strokeStyle = 'rgba(0,0,0,0.55)'; ctx.lineWidth = 1;
+    [DOUBLE_OUTER, DOUBLE_INNER, TREBLE_OUTER, TREBLE_INNER, OUTER_BULL].forEach(f => {
+      ctx.beginPath(); ctx.arc(0,0,f*R,0,Math.PI*2); ctx.stroke();
+    });
+
+    // darts thrown this turn
+    turnMarks.forEach((m, i) => {
+      ctx.save();
+      ctx.translate(m.dx, m.dy);
+      ctx.rotate(-Math.PI/4);
+      ctx.fillStyle = i === turnMarks.length-1 ? '#ffe9a8' : '#d4af6a';
+      ctx.beginPath();
+      ctx.moveTo(0,-9); ctx.lineTo(3,6); ctx.lineTo(-3,6); ctx.closePath();
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(0,0,0,0.6)'; ctx.lineWidth = 1; ctx.stroke();
+      ctx.restore();
+    });
+
+    ctx.restore();
+  }
+
+  // ---------- GAME LOOP ----------
+  function loop(){
+    aimPad.classList.toggle('disabled', !canShoot());
+    requestAnimationFrame(loop);
+  }
+
+  window.startMatch = startMatch;
+  startMatch();
+  requestAnimationFrame(loop);
+})();
+</script>
+<script>
+  Arcade.registerServiceWorker();
+</script>
+</body>
+</html>
