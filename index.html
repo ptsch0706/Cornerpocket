@@ -12,8 +12,14 @@
 <meta name="theme-color" content="#0d0b09">
 <style>
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-  html, body {
-    margin: 0; padding: 0; height: 100%;
+  html {
+    height: 100%;
+    height: -webkit-fill-available;
+  }
+  body {
+    margin: 0; padding: 0;
+    min-height: 100%;
+    min-height: -webkit-fill-available;
     background: radial-gradient(ellipse at 50% 0%, #201c17 0%, #0d0b09 60%, #080706 100%);
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
     color: #efe8da;
@@ -25,8 +31,9 @@
     display: flex;
     flex-direction: column;
     align-items: center;
-    padding: 10px 14px calc(22px + env(safe-area-inset-bottom));
+    padding: calc(10px + env(safe-area-inset-top)) calc(14px + env(safe-area-inset-right)) calc(22px + env(safe-area-inset-bottom)) calc(14px + env(safe-area-inset-left));
     min-height: 100%;
+    min-height: -webkit-fill-available;
     max-width: 540px;
     margin: 0 auto;
   }
@@ -853,6 +860,29 @@
       b.vy *= FRICTION;
       if(Math.hypot(b.vx,b.vy) < STOP_SPEED){ b.vx = 0; b.vy = 0; }
 
+      // Check pockets BEFORE the cushion clamp below. If we clamp first, the ball's
+      // center can never get closer than one ball-radius to any rail (including the
+      // corners), which is farther than any reasonable catch radius — so potting
+      // would be geometrically impossible. Checking here lets a ball actually reach
+      // the mouth of a pocket along its real trajectory.
+      let caughtByPocket = false;
+      for(const p of POCKETS){
+        const d = Math.hypot(b.x-p.x, b.y-p.y);
+        const catchRadius = p.r - b.r*0.3; // ball must be mostly over the mouth, not just near the rim
+        if(d < catchRadius){
+          b.potted = true;
+          b.vx = 0; b.vy = 0;
+          if(b.type === 'cue'){
+            cueScratched = true;
+          } else {
+            pottedThisShot.push(b);
+          }
+          caughtByPocket = true;
+          break;
+        }
+      }
+      if(caughtByPocket) return;
+
       if(b.x - b.r < LEFT){ b.x = LEFT + b.r; b.vx = -b.vx*WALL_REST; }
       if(b.x + b.r > RIGHT){ b.x = RIGHT - b.r; b.vx = -b.vx*WALL_REST; }
       if(b.y - b.r < TOP){ b.y = TOP + b.r; b.vy = -b.vy*WALL_REST; }
@@ -887,23 +917,6 @@
         }
       }
     }
-
-    balls.forEach(b => {
-      if(b.potted) return;
-      POCKETS.forEach(p => {
-        const d = Math.hypot(b.x-p.x, b.y-p.y);
-        const catchRadius = p.r - b.r*0.55; // ball must be mostly over the mouth, not just near the rim
-        if(d < catchRadius){
-          b.potted = true;
-          b.vx = 0; b.vy = 0;
-          if(b.type === 'cue'){
-            cueScratched = true;
-          } else {
-            pottedThisShot.push(b);
-          }
-        }
-      });
-    });
   }
 
   function resolveShotIfSettled(){
