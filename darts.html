@@ -19,6 +19,72 @@
   }
   .darts-pips .pip.used { background:#d4af6a; border-color:#a9853c; }
   .score-panel .big { font-size:22px; font-weight:700; color:#e9d9a8; line-height:1.1; margin-top:2px; }
+
+  #dualControls {
+    display: flex;
+    gap: 22px;
+    align-items: flex-start;
+    justify-content: center;
+    margin-top: 16px;
+  }
+  .ctrl-col { display: flex; flex-direction: column; align-items: center; }
+  .ctrl-label {
+    font-size: 11px;
+    color: #8d8172;
+    margin-top: 8px;
+    text-align: center;
+    max-width: 120px;
+  }
+  #aimStick {
+    width: 130px;
+    height: 130px;
+    border-radius: 50%;
+    border: 2px solid #3a3327;
+    background: radial-gradient(circle, #1c1913 0%, #14120e 75%);
+    box-shadow: inset 0 2px 10px rgba(0,0,0,0.6), 0 2px 6px rgba(0,0,0,0.4);
+    position: relative;
+    touch-action: none;
+    transition: opacity 0.2s;
+  }
+  #aimStick::before {
+    content: "";
+    position: absolute;
+    inset: 14%;
+    border-radius: 50%;
+    border: 1px dashed #4a4232;
+  }
+  #aimStick.disabled { opacity: 0.3; }
+  #aimStickKnob {
+    width: 34%;
+    height: 34%;
+    border-radius: 50%;
+    background: radial-gradient(circle at 35% 30%, #ecd8a6, #b98f46);
+    position: absolute;
+    left: 50%; top: 50%;
+    transform: translate(-50%,-50%);
+    box-shadow: 0 3px 10px rgba(0,0,0,0.6);
+    pointer-events: none;
+  }
+  #powerMeter {
+    width: 56px;
+    height: 130px;
+    border-radius: 10px;
+    border: 2px solid #3a3327;
+    background: linear-gradient(180deg, #4a9d5c 0%, #d4af6a 55%, #c0453f 100%);
+    position: relative;
+    overflow: hidden;
+    touch-action: none;
+    transition: opacity 0.2s;
+  }
+  #powerMeter.disabled { opacity: 0.3; }
+  #powerMeterMarker {
+    position: absolute;
+    left: 0; right: 0;
+    height: 4px;
+    background: #fff;
+    box-shadow: 0 0 4px rgba(0,0,0,0.7);
+    top: 50%;
+  }
 </style>
 </head>
 <body>
@@ -82,19 +148,25 @@
   </div>
 
   <div id="message">Loading...</div>
-  <div id="powerWrap"><div id="powerBar"></div></div>
 
-  <div id="aimPadWrap">
-    <div id="aimPad"><div id="aimKnob"></div></div>
-    <div id="aimPadLabel">Point at your target, pull hard, release</div>
+  <div id="dualControls">
+    <div class="ctrl-col">
+      <div id="aimStick"><div id="aimStickKnob"></div></div>
+      <div class="ctrl-label">Aim</div>
+    </div>
+    <div class="ctrl-col">
+      <div id="powerMeter"><div id="powerMeterMarker"></div></div>
+      <div class="ctrl-label">Tap to lock power</div>
+    </div>
   </div>
 
   <div class="help">
-    The pad's direction is where you're aiming — a small nudge toward center is a bullseye
-    attempt. How far you actually pull it is your throw's strength: pull all the way for a true
-    shot, or an under-pull lets gravity drag it low. Standard 501: first to exactly 0 wins, but
-    your last dart must land on a double (or the bullseye). Overshoot, land on 1, or reach 0
-    without a double, and the whole turn is voided.
+    Left stick sets where you're aiming — it stays put once you let go, so line it up first.
+    The right bar bounces between weak and full power on its own; tap it at the moment you
+    want to commit. A full-power tap throws true to your aim; tapping early or late under-commits
+    and gravity drags the dart low. Standard 501: first to exactly 0 wins, but your last dart
+    must land on a double (or the bullseye). Overshoot, land on 1, or reach 0 without a double,
+    and the whole turn is voided.
   </div>
 
 </div>
@@ -171,12 +243,11 @@
   let state = 'aiming'; // 'aiming' | 'throwing' | 'ai-wait' | 'over'
   let gameOver = false;
   let flight = null; // in-flight dart animation: {owner,targetDX,targetDY,t0}
-  let livePreview = null; // {x,y} live aim+drop preview while dragging, before release
+  let aimX = 0, aimY = 0; // current aim offset from board center — persists between throws
 
   const canvas = document.getElementById('table');
   const ctx = canvas.getContext('2d');
   const messageEl = document.getElementById('message');
-  const powerBar = document.getElementById('powerBar');
   const overlay = document.getElementById('overlay');
   const overlayTitle = document.getElementById('overlayTitle');
   const overlayText = document.getElementById('overlayText');
@@ -187,8 +258,10 @@
   const playerPips = document.getElementById('playerPips').children;
   const aiPips = document.getElementById('aiPips').children;
   const difficultySel = document.getElementById('difficulty');
-  const aimPad = document.getElementById('aimPad');
-  const aimKnob = document.getElementById('aimKnob');
+  const aimStick = document.getElementById('aimStick');
+  const aimStickKnob = document.getElementById('aimStickKnob');
+  const powerMeter = document.getElementById('powerMeter');
+  const powerMeterMarker = document.getElementById('powerMeterMarker');
 
   function setMessage(t){ messageEl.textContent = t; }
 
@@ -204,13 +277,12 @@
     dartsThisTurn = 0;
     turnMarks = [];
     flight = null;
-    livePreview = null;
     turnStartRemaining = remaining[turn];
     updateScoreDisplays();
     updatePanels();
     if(turn === 'player'){
       state = 'aiming';
-      setMessage("Your throw — drag toward your target.");
+      setMessage("Your throw — line up the stick, tap the power bar when ready.");
     } else {
       state = 'ai-wait';
       setMessage("Computer is throwing...");
@@ -219,34 +291,83 @@
     render();
   }
 
-  // ---------- AIM PAD: direction = where you're pointing, power = how hard you commit ----------
-  // The pad's direction (not how far you drag) sets your full-strength aim point — so a
-  // bullseye attempt just means pointing at the center, at any drag distance. Separately,
-  // how far you actually pull the pad is your throw's force: pull all the way and the dart
-  // flies true to your aim; pull weak and gravity drags it low, undershooting straight down
-  // from wherever you were aiming — same as a real underpowered throw.
-  const MAX_OFFSET = R * 1.15;   // full-strength distance from center a throw can reach
-  const DROP_MAX = R * 0.5;      // how far a bare-minimum-strength throw drops below the aim
-  const THROW_DURATION_MS = 380; // quick flight — darts travel fast
+  // ---------- CONTROLS: aim stick (persistent, no spring-back) + power meter (tap to lock) ----------
+  // The stick sets direction only — full strength, immediately, and it stays wherever you left
+  // it rather than snapping back, since aiming and throwing are now two separate actions. The
+  // power meter bounces on its own; tapping it captures whatever strength it's at that instant
+  // and throws right then. Full power throws true; anything less lets gravity drag it low.
+  const MAX_OFFSET = R * 1.15;    // full-strength distance from center a throw can reach
+  const DROP_MAX = R * 0.5;       // how far a zero-strength tap drops below the aim
+  const THROW_DURATION_MS = 380;  // quick flight — darts travel fast
   const LAUNCH_DX = 0, LAUNCH_DY = R * 1.35; // where the throw visually enters the scene, below the board
+  const STICK_RADIUS_FRAC = 0.42; // fraction of the stick's own radius the knob can travel
+  const POWER_PERIOD_MS = 950;    // full bounce cycle of the power meter
 
   function canShoot(){
     return turn === 'player' && state === 'aiming' && !gameOver;
   }
-  Arcade.createAimPad({
-    padEl: aimPad, knobEl: aimKnob, powerBarEl: powerBar,
-    canShoot: canShoot,
-    onMove: (dx, dy, power) => {
-      livePreview = { x: dx*MAX_OFFSET, y: dy*MAX_OFFSET + (1-power)*DROP_MAX };
-      render();
-    },
-    onRelease: (dx, dy, power) => {
-      const targetDX = dx * MAX_OFFSET;
-      const targetDY = dy * MAX_OFFSET + (1-power) * DROP_MAX;
-      livePreview = null;
-      beginDartFlight('player', targetDX, targetDY);
-    }
-  });
+
+  function currentPowerLevel(){
+    const t = (performance.now() % POWER_PERIOD_MS) / POWER_PERIOD_MS;
+    return t < 0.5 ? t*2 : 2 - t*2; // 0 -> 1 -> 0, bouncing
+  }
+
+  // --- aim stick: drag to set direction; releasing leaves it in place ---
+  let aimDragging = false;
+  function stickPoint(evt){
+    const t = evt.touches ? evt.touches[0] : evt;
+    return { x: t.clientX, y: t.clientY };
+  }
+  function aimStickDown(evt){
+    if(!canShoot()) return;
+    evt.preventDefault();
+    aimDragging = true;
+    updateAimFromEvent(evt);
+  }
+  function aimStickMove(evt){
+    if(!aimDragging) return;
+    evt.preventDefault();
+    updateAimFromEvent(evt);
+  }
+  function aimStickUp(evt){
+    if(!aimDragging) return;
+    aimDragging = false;
+    evt.preventDefault();
+    // no reset here — the knob (and aim) stay exactly where they were released
+  }
+  function updateAimFromEvent(evt){
+    const rect = aimStick.getBoundingClientRect();
+    const cx = rect.left + rect.width/2, cy = rect.top + rect.height/2;
+    const maxR = rect.width * STICK_RADIUS_FRAC;
+    const p = stickPoint(evt);
+    const dx = p.x - cx, dy = p.y - cy;
+    const dist = Math.hypot(dx, dy);
+    const clamped = Math.min(dist, maxR);
+    const ux = dist > 0 ? dx/dist : 0, uy = dist > 0 ? dy/dist : 0;
+    aimStickKnob.style.transform = `translate(calc(-50% + ${ux*clamped}px), calc(-50% + ${uy*clamped}px))`;
+    const frac = maxR > 0 ? clamped/maxR : 0;
+    aimX = ux * frac * MAX_OFFSET;
+    aimY = uy * frac * MAX_OFFSET;
+    render();
+  }
+  aimStick.addEventListener('pointerdown', aimStickDown);
+  window.addEventListener('pointermove', aimStickMove);
+  window.addEventListener('pointerup', aimStickUp);
+  aimStick.addEventListener('touchstart', aimStickDown, { passive: false });
+  window.addEventListener('touchmove', aimStickMove, { passive: false });
+  window.addEventListener('touchend', aimStickUp, { passive: false });
+
+  // --- power meter: tap to lock the current bounce level and throw immediately ---
+  function powerMeterTap(evt){
+    if(!canShoot()) return;
+    evt.preventDefault();
+    const power = currentPowerLevel();
+    const targetDX = aimX;
+    const targetDY = aimY + (1 - power) * DROP_MAX;
+    beginDartFlight('player', targetDX, targetDY);
+  }
+  powerMeter.addEventListener('pointerdown', powerMeterTap);
+  powerMeter.addEventListener('touchstart', powerMeterTap, { passive: false });
 
   function beginDartFlight(owner, targetDX, targetDY){
     state = 'throwing';
@@ -461,10 +582,10 @@
       ctx.restore();
     }
 
-    // live preview while dragging: where it'll land right now, given current aim + pull strength
-    if(livePreview){
+    // persistent aim reticle — reflects wherever the stick was last set, always visible during aiming
+    if(state === 'aiming' && turn === 'player' && !gameOver){
       ctx.save();
-      ctx.translate(livePreview.x, livePreview.y);
+      ctx.translate(aimX, aimY);
       ctx.strokeStyle = 'rgba(255,255,255,0.8)';
       ctx.lineWidth = 2;
       ctx.beginPath(); ctx.moveTo(-11,0); ctx.lineTo(11,0); ctx.stroke();
@@ -508,7 +629,13 @@
         finishDartFlight();
       }
     }
-    aimPad.classList.toggle('disabled', !canShoot());
+    const shootable = canShoot();
+    aimStick.classList.toggle('disabled', !shootable);
+    powerMeter.classList.toggle('disabled', !shootable);
+    if(shootable){
+      const level = currentPowerLevel();
+      powerMeterMarker.style.top = ((1 - level) * 100).toFixed(1) + '%';
+    }
     requestAnimationFrame(loop);
   }
 
