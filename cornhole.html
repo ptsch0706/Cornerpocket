@@ -86,6 +86,19 @@
     </div>
   </div>
 
+  <div id="coinOverlay">
+    <h2>Who Tosses First?</h2>
+    <p id="coinPrompt">Tap the coin to flip</p>
+    <div class="coinStage">
+      <div class="coin" id="coin">
+        <div class="face front">YOU</div>
+        <div class="face back">CPU</div>
+      </div>
+    </div>
+    <p id="coinResultText" class="coinResult"></p>
+    <button class="primary" id="coinStartBtn" style="display:none;">Start Match</button>
+  </div>
+
   <div id="message">Loading...</div>
   <div id="powerWrap"><div id="powerBar"></div></div>
 
@@ -114,14 +127,27 @@
   const BOARD_X0 = 95, BOARD_X1 = 265;
   const BOARD_Y0 = 40, BOARD_Y1 = 131;
   const HOLE_X = 180, HOLE_Y = 60, HOLE_R = 17;
+  const BOARD_INSET = 22; // px the far/top edge is narrower than the near/bottom edge — sells perspective
+  const BOARD_LIP = 10;   // px height of the board's visible front edge (its raised thickness)
 
   const WIN_SCORE = 21;
   const THROW_DURATION_MS = 650;
+  const SLIDE_FRICTION = 0.90;
+  const SLIDE_STOP_SPEED = 0.15;
+
+  /** True if (x,y) falls within the board's trapezoid footprint (matches how it's drawn). */
+  function isOnBoard(x, y){
+    if(y < BOARD_Y0 || y > BOARD_Y1) return false;
+    const t = (y - BOARD_Y0) / (BOARD_Y1 - BOARD_Y0); // 0 at the far/narrow edge, 1 at the near/wide edge
+    const xLeft = (BOARD_X0 + BOARD_INSET) + t * (BOARD_X0 - (BOARD_X0 + BOARD_INSET));
+    const xRight = (BOARD_X1 - BOARD_INSET) + t * (BOARD_X1 - (BOARD_X1 - BOARD_INSET));
+    return x >= xLeft && x <= xRight;
+  }
 
   function resultForLanding(x, y){
     const dHole = Math.hypot(x-HOLE_X, y-HOLE_Y);
     if(dHole <= HOLE_R) return { value: 3, label: 'In the hole!' };
-    if(x >= BOARD_X0 && x <= BOARD_X1 && y >= BOARD_Y0 && y <= BOARD_Y1) return { value: 1, label: 'On the board.' };
+    if(isOnBoard(x, y)) return { value: 1, label: 'On the board.' };
     return { value: 0, label: 'Missed — in the dirt.' };
   }
 
@@ -137,6 +163,17 @@
   renderStats();
   Arcade.wireSettingsModal('settingsBtn', 'settingsModal', 'settingsCloseBtn');
 
+  const coinFlip = Arcade.createCoinFlip({
+    overlayId: 'coinOverlay', coinId: 'coin', promptId: 'coinPrompt',
+    resultId: 'coinResultText', startBtnId: 'coinStartBtn',
+    startLabel: 'Start Match',
+    resultText: {
+      player: "You win the toss — you toss first!",
+      ai: "Computer wins the toss — it tosses first!"
+    },
+    onStart: beginMatch
+  });
+
   // ---------- STATE ----------
   let bags = [];              // bags landed so far this round: {owner,x,y,result}
   let shotsThisRound = 0;     // 0..8
@@ -146,6 +183,7 @@
   let state = 'aiming';       // 'aiming' | 'throwing' | 'ai-wait' | 'over'
   let gameOver = false;
   let flight = null;          // active toss animation: {owner,startX,startY,targetX,targetY,t0}
+  let slide = null;           // active post-landing slide: {owner,x,y,vx,vy,result}
 
   const canvas = document.getElementById('table');
   const ctx = canvas.getContext('2d');
@@ -174,13 +212,18 @@
     playerScore = 0; aiScore = 0;
     gameOver = false;
     overlay.style.display = 'none';
-    startingPlayer = Math.random() < 0.5 ? 'player' : 'ai';
+    coinFlip.show();
+  }
+
+  function beginMatch(starting){
+    startingPlayer = starting;
     startRound();
   }
 
   function startRound(){
     bags = [];
     shotsThisRound = 0;
+    slide = null;
     updateScoreDisplays();
     beginNextThrow();
   }
@@ -228,9 +271,22 @@
     const f = flight;
     flight = null;
     const result = resultForLanding(f.targetX, f.targetY);
-    bags.push({ owner: f.owner, x: f.targetX, y: f.targetY, result });
+    if(result.value === 1){
+      // landed on the board with some momentum left — let it slide a bit, like a real toss
+      const dx = f.targetX - f.startX, dy = f.targetY - f.startY;
+      const dist = Math.hypot(dx, dy);
+      const ux = dist > 0 ? dx/dist : 0, uy = dist > 0 ? dy/dist : -1;
+      const slideSpeed = 1.6 + Math.random() * 3.2;
+      slide = { owner: f.owner, x: f.targetX, y: f.targetY, vx: ux*slideSpeed, vy: uy*slideSpeed, result };
+    } else {
+      finalizeBagLanding(f.owner, f.targetX, f.targetY, result);
+    }
+  }
+
+  function finalizeBagLanding(owner, x, y, result){
+    bags.push({ owner, x, y, result });
     shotsThisRound++;
-    setMessage(`${f.owner === 'player' ? 'You' : 'Computer'}: ${result.label}${result.value>0 ? ' ('+result.value+' pt'+(result.value>1?'s':'')+')' : ''}`);
+    setMessage(`${owner === 'player' ? 'You' : 'Computer'}: ${result.label}${result.value>0 ? ' ('+result.value+' pt'+(result.value>1?'s':'')+')' : ''}`);
     setTimeout(beginNextThrow, 550);
   }
 
@@ -315,18 +371,57 @@
     ctx.beginPath(); ctx.moveTo(LANE_LEFT,0); ctx.lineTo(LANE_LEFT,CH); ctx.stroke();
     ctx.beginPath(); ctx.moveTo(LANE_RIGHT,0); ctx.lineTo(LANE_RIGHT,CH); ctx.stroke();
 
-    // board
-    const boardGrad = ctx.createLinearGradient(0,BOARD_Y0,0,BOARD_Y1);
-    boardGrad.addColorStop(0,'#c9a55c'); boardGrad.addColorStop(1,'#a97e3c');
-    ctx.fillStyle = boardGrad;
-    ctx.fillRect(BOARD_X0, BOARD_Y0, BOARD_X1-BOARD_X0, BOARD_Y1-BOARD_Y0);
-    ctx.strokeStyle = 'rgba(0,0,0,0.4)'; ctx.lineWidth = 3;
-    ctx.strokeRect(BOARD_X0, BOARD_Y0, BOARD_X1-BOARD_X0, BOARD_Y1-BOARD_Y0);
+    // board corners: top (far) edge is narrower than the bottom (near) edge — forced perspective
+    const bx0Top = BOARD_X0 + BOARD_INSET, bx1Top = BOARD_X1 - BOARD_INSET;
+    const bx0Bot = BOARD_X0, bx1Bot = BOARD_X1;
 
-    // hole
+    // soft ground shadow, cast slightly forward/down to sell the board being raised off the field
+    ctx.save();
+    ctx.filter = 'blur(5px)';
+    ctx.beginPath();
+    ctx.moveTo(bx0Top-4, BOARD_Y0+10);
+    ctx.lineTo(bx1Top+4, BOARD_Y0+10);
+    ctx.lineTo(bx1Bot+9, BOARD_Y1+BOARD_LIP+11);
+    ctx.lineTo(bx0Bot-9, BOARD_Y1+BOARD_LIP+11);
+    ctx.closePath();
+    ctx.fillStyle = 'rgba(0,0,0,0.38)';
+    ctx.fill();
+    ctx.restore();
+
+    // front lip — the board's visible edge thickness, raised off the ground
+    ctx.beginPath();
+    ctx.moveTo(bx0Bot, BOARD_Y1);
+    ctx.lineTo(bx1Bot, BOARD_Y1);
+    ctx.lineTo(bx1Bot, BOARD_Y1+BOARD_LIP);
+    ctx.lineTo(bx0Bot, BOARD_Y1+BOARD_LIP);
+    ctx.closePath();
+    const lipGrad = ctx.createLinearGradient(0,BOARD_Y1,0,BOARD_Y1+BOARD_LIP);
+    lipGrad.addColorStop(0,'#7a5a2e'); lipGrad.addColorStop(1,'#40300f');
+    ctx.fillStyle = lipGrad;
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(0,0,0,0.5)'; ctx.lineWidth = 1.2; ctx.stroke();
+
+    // board surface (trapezoid)
+    ctx.beginPath();
+    ctx.moveTo(bx0Top, BOARD_Y0);
+    ctx.lineTo(bx1Top, BOARD_Y0);
+    ctx.lineTo(bx1Bot, BOARD_Y1);
+    ctx.lineTo(bx0Bot, BOARD_Y1);
+    ctx.closePath();
+    const boardGrad = ctx.createLinearGradient(0,BOARD_Y0,0,BOARD_Y1);
+    boardGrad.addColorStop(0,'#dab86e'); boardGrad.addColorStop(1,'#a97e3c');
+    ctx.fillStyle = boardGrad;
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(0,0,0,0.4)'; ctx.lineWidth = 2.5; ctx.stroke();
+
+    // hole — recessed cut into the wood, not just a flat circle
+    ctx.beginPath(); ctx.arc(HOLE_X, HOLE_Y, HOLE_R*1.3, 0, Math.PI*2);
+    ctx.fillStyle = 'rgba(0,0,0,0.32)'; ctx.fill();
     ctx.beginPath(); ctx.arc(HOLE_X, HOLE_Y, HOLE_R, 0, Math.PI*2);
     ctx.fillStyle = '#0a0a0a'; ctx.fill();
     ctx.strokeStyle = 'rgba(0,0,0,0.6)'; ctx.lineWidth = 2; ctx.stroke();
+    ctx.beginPath(); ctx.arc(HOLE_X, HOLE_Y, HOLE_R-0.5, Math.PI*0.78, Math.PI*1.3);
+    ctx.strokeStyle = 'rgba(255,255,255,0.14)'; ctx.lineWidth = 1.4; ctx.stroke();
 
     // resting bags (on board or in the dirt) — draw shadow + bag flat on the ground
     bags.forEach(b => {
@@ -361,6 +456,16 @@
       drawBagShape(flight.owner);
       ctx.restore();
     }
+
+    // bag currently sliding across the board after landing
+    if(slide){
+      ctx.save();
+      ctx.translate(slide.x, slide.y);
+      ctx.beginPath(); ctx.ellipse(0,3,12,6,0,0,Math.PI*2);
+      ctx.fillStyle = 'rgba(0,0,0,0.35)'; ctx.fill();
+      drawBagShape(slide.owner);
+      ctx.restore();
+    }
   }
 
   function drawBagShape(owner){
@@ -378,6 +483,27 @@
       render();
       if(performance.now() - flight.t0 >= THROW_DURATION_MS){
         finishFlight();
+      }
+    } else if(slide){
+      slide.x += slide.vx; slide.y += slide.vy;
+      slide.vx *= SLIDE_FRICTION; slide.vy *= SLIDE_FRICTION;
+      render();
+
+      const dHole = Math.hypot(slide.x-HOLE_X, slide.y-HOLE_Y);
+      const speed = Math.hypot(slide.vx, slide.vy);
+      if(dHole <= HOLE_R){
+        const owner = slide.owner;
+        slide = null;
+        finalizeBagLanding(owner, HOLE_X, HOLE_Y, { value: 3, label: 'Slid into the hole!' });
+      } else if(!isOnBoard(slide.x, slide.y) || speed < SLIDE_STOP_SPEED){
+        let fx = slide.x, fy = slide.y;
+        if(!isOnBoard(fx, fy)){
+          fx = Math.max(BOARD_X0+8, Math.min(BOARD_X1-8, fx));
+          fy = Math.max(BOARD_Y0+6, Math.min(BOARD_Y1-6, fy));
+        }
+        const owner = slide.owner, res = slide.result;
+        slide = null;
+        finalizeBagLanding(owner, fx, fy, res);
       }
     } else if(state !== 'aiming'){
       render();

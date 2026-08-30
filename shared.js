@@ -130,6 +130,70 @@ window.Arcade = (function () {
     modal.addEventListener('click', (e) => { if (e.target === modal) modal.classList.remove('open'); });
   }
 
+  /**
+   * Wires up the shared coin-flip overlay used to decide who goes first.
+   * Call .show() whenever a match is starting (page load, "New Game", "Play Again").
+   * The user taps the coin to flip it, then taps the start button, which fires
+   * onStart('player'|'ai') and hides the overlay — the caller uses that value to
+   * actually begin play.
+   *
+   * options:
+   *   overlayId, coinId, promptId, resultId, startBtnId — element ids (required)
+   *   startLabel  - text for the start button, e.g. "Start Match" (required)
+   *   resultText  - { player: "...", ai: "..." } messages shown after the flip (required)
+   *   onStart(startingPlayer) - called once the user taps start
+   */
+  function createCoinFlip(options) {
+    const { overlayId, coinId, promptId, resultId, startBtnId, startLabel, resultText, onStart } = options;
+    const overlay = document.getElementById(overlayId);
+    const coinEl = document.getElementById(coinId);
+    const promptEl = document.getElementById(promptId);
+    const resultEl = document.getElementById(resultId);
+    const startBtn = document.getElementById(startBtnId);
+    if (startBtn && startLabel) startBtn.textContent = startLabel;
+
+    let flipping = false;
+    let pendingTurn = null;
+
+    function show() {
+      flipping = false;
+      pendingTurn = null;
+      coinEl.style.transition = 'none';
+      coinEl.style.transform = 'rotateY(0deg)';
+      promptEl.textContent = 'Tap the coin to flip';
+      resultEl.textContent = '';
+      startBtn.style.display = 'none';
+      overlay.classList.add('open');
+      void coinEl.offsetWidth; // force reflow so the next flip transitions cleanly
+      coinEl.style.transition = '';
+    }
+
+    function flip() {
+      if (flipping) return;
+      flipping = true;
+      promptEl.textContent = 'Flipping…';
+      const result = Math.random() < 0.5 ? 'player' : 'ai';
+      pendingTurn = result;
+      const spins = 5 + Math.floor(Math.random() * 3);
+      const finalDeg = spins * 360 + (result === 'player' ? 0 : 180);
+      coinEl.style.transform = `rotateY(${finalDeg}deg)`;
+      setTimeout(() => {
+        resultEl.textContent = result === 'player' ? resultText.player : resultText.ai;
+        promptEl.textContent = '';
+        startBtn.style.display = 'inline-block';
+        flipping = false;
+      }, 1750);
+    }
+
+    coinEl.addEventListener('click', flip);
+    startBtn.addEventListener('click', () => {
+      overlay.classList.remove('open');
+      onStart(pendingTurn);
+    });
+
+    return { show };
+  }
+
   /** Registers the shared service worker and reloads once a new version takes over. */
   function registerServiceWorker() {
     if (!('serviceWorker' in navigator)) return;
@@ -144,5 +208,5 @@ window.Arcade = (function () {
     });
   }
 
-  return { createAimPad, createStats, wireSettingsModal, registerServiceWorker };
+  return { createAimPad, createStats, wireSettingsModal, createCoinFlip, registerServiceWorker };
 })();

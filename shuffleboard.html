@@ -86,6 +86,19 @@
     </div>
   </div>
 
+  <div id="coinOverlay">
+    <h2>Who Shoots First?</h2>
+    <p id="coinPrompt">Tap the coin to flip</p>
+    <div class="coinStage">
+      <div class="coin" id="coin">
+        <div class="face front">YOU</div>
+        <div class="face back">CPU</div>
+      </div>
+    </div>
+    <p id="coinResultText" class="coinResult"></p>
+    <button class="primary" id="coinStartBtn" style="display:none;">Start Match</button>
+  </div>
+
   <div id="message">Loading...</div>
   <div id="powerWrap"><div id="powerBar"></div></div>
 
@@ -145,6 +158,17 @@
   renderStats();
   Arcade.wireSettingsModal('settingsBtn', 'settingsModal', 'settingsCloseBtn');
 
+  const coinFlip = Arcade.createCoinFlip({
+    overlayId: 'coinOverlay', coinId: 'coin', promptId: 'coinPrompt',
+    resultId: 'coinResultText', startBtnId: 'coinStartBtn',
+    startLabel: 'Start Match',
+    resultText: {
+      player: "You win the toss — you shoot first!",
+      ai: "Computer wins the toss — it shoots first!"
+    },
+    onStart: beginMatch
+  });
+
   // ---------- STATE ----------
   let pucks = [];           // all pucks thrown this end (both players)
   let activePuck = null;    // the puck currently live/ready to be shot
@@ -189,7 +213,11 @@
     playerScore = 0; aiScore = 0;
     gameOver = false;
     overlay.style.display = 'none';
-    startingPlayer = Math.random() < 0.5 ? 'player' : 'ai';
+    coinFlip.show();
+  }
+
+  function beginMatch(starting){
+    startingPlayer = starting;
     startEnd();
   }
 
