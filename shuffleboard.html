@@ -79,7 +79,7 @@
   </div>
 
   <div id="tableWrap">
-    <canvas id="table" width="360" height="260"></canvas>
+    <canvas id="table" width="360" height="400"></canvas>
     <div id="overlay">
       <h2 id="overlayTitle">Game Over</h2>
       <p id="overlayText">Details here</p>
@@ -92,14 +92,14 @@
 
   <div id="aimPadWrap">
     <div id="aimPad"><div id="aimKnob"></div></div>
-    <div id="aimPadLabel">Pull back, release to slide</div>
+    <div id="aimPadLabel">Drag puck sideways to aim, pad to shoot</div>
   </div>
 
   <div class="help">
     4 pucks each per end. Only the closer player's leading pucks score. First to 21 wins.
   </div>
 
-  <div id="appVersion">v1.1.2</div>
+  <div id="appVersion">v1.1.4</div>
 </div>
 
 <script src="shared.js"></script>
@@ -108,21 +108,21 @@
   "use strict";
 
   // ---------- CONFIG ----------
-  const CW = 360, CH = 260;
+  const CW = 360, CH = 400;
   const LANE_LEFT = 64, LANE_RIGHT = CW - 64;
   const PUCK_R = 13;
   const FRICTION = 0.99;
   const STOP_SPEED = 0.05;
-  const MAX_SPEED = 4;
+  const MAX_SPEED = 6;
 
-  const LANE_START_Y = 240;   // where a fresh puck is placed to be shot
-  const BOTTOM_DEAD_Y = 252;  // knocked back past here = off the near end
-  const FOUL_LINE_Y = 205;    // must cross this to score anything
-  const ZONE1_END_Y = 170;    // [170,205) = zone 1
-  const ZONE2_END_Y = 135;    // [135,170) = zone 2
-  const ZONE3_END_Y = 100;    // [100,135) = zone 3
-  const ZONE4_END_Y = 58;     // [58,100) = zone 4 ("hanging")
-  const OFF_EDGE_Y = 58;      // below this = fell off the far edge
+  const LANE_START_Y = 370;   // where a fresh puck is placed to be shot
+  const BOTTOM_DEAD_Y = 389;  // knocked back past here = off the near end
+  const FOUL_LINE_Y = 316;    // must cross this to score anything
+  const ZONE1_END_Y = 262;    // [262,316) = zone 1
+  const ZONE2_END_Y = 208;    // [208,262) = zone 2
+  const ZONE3_END_Y = 154;    // [154,208) = zone 3
+  const ZONE4_END_Y = 89;     // [89,154) = zone 4 ("hanging")
+  const OFF_EDGE_Y = 89;      // below this = fell off the far edge
 
   const WIN_SCORE = 21;
 
@@ -242,6 +242,45 @@
     state = 'rolling';
   }
 
+  // ---------- PUCK PLACEMENT: drag horizontally to set up different shot angles ----------
+  function canRepositionPuck(){
+    return canShoot() && !!activePuck;
+  }
+  function canvasCoords(evt){
+    const rect = canvas.getBoundingClientRect();
+    const t = evt.touches ? evt.touches[0] : evt;
+    const scaleX = CW / rect.width;
+    return { x: (t.clientX - rect.left) * scaleX };
+  }
+  let repositioning = false;
+  function puckDown(evt){
+    if(!canRepositionPuck()) return;
+    evt.preventDefault();
+    repositioning = true;
+    updatePuckX(evt);
+  }
+  function puckMove(evt){
+    if(!repositioning) return;
+    evt.preventDefault();
+    updatePuckX(evt);
+  }
+  function puckUp(evt){
+    if(!repositioning) return;
+    repositioning = false;
+    evt.preventDefault();
+  }
+  function updatePuckX(evt){
+    const p = canvasCoords(evt);
+    activePuck.x = Math.min(LANE_RIGHT - PUCK_R, Math.max(LANE_LEFT + PUCK_R, p.x));
+    render();
+  }
+  canvas.addEventListener('pointerdown', puckDown);
+  window.addEventListener('pointermove', puckMove);
+  window.addEventListener('pointerup', puckUp);
+  canvas.addEventListener('touchstart', puckDown, { passive: false });
+  window.addEventListener('touchmove', puckMove, { passive: false });
+  window.addEventListener('touchend', puckUp, { passive: false });
+
   // ---------- PHYSICS ----------
   function allStopped(){
     return pucks.every(p => p.dead || p.resting);
@@ -357,7 +396,7 @@
   function aiTakeShot(){
     if(gameOver) return;
     const diff = difficultySel.value;
-    const errorPx = diff==='easy' ? 15 : diff==='hard' ? 3 : 7;
+    const errorPx = diff==='easy' ? 23 : diff==='hard' ? 5 : 11;
     const powerNoise = diff==='easy' ? 0.20 : diff==='hard' ? 0.04 : 0.11;
 
     // figure out if the opponent currently holds the lead and is worth knocking
@@ -371,7 +410,7 @@
       target = { x: alive[0].p.x, y: alive[0].p.y - 8 }; // aim slightly past its center for a clean hit through
     } else {
       // lay up in the best zone (aim for the hang zone, with a little room to spare)
-      target = { x: laneCenterX() + (Math.random()*2-1)*14, y: ZONE4_END_Y + 20 };
+      target = { x: laneCenterX() + (Math.random()*2-1)*14, y: ZONE4_END_Y + 31 };
     }
 
     target.x += (Math.random()*2-1) * errorPx;
@@ -425,6 +464,17 @@
     ctx.beginPath(); ctx.moveTo(LANE_LEFT, OFF_EDGE_Y); ctx.lineTo(LANE_RIGHT, OFF_EDGE_Y); ctx.stroke();
 
     pucks.forEach(p => { if(!p.dead) drawPuck(p); });
+
+    if(canRepositionPuck()){
+      ctx.save();
+      ctx.setLineDash([4,4]);
+      ctx.lineWidth = 2;
+      ctx.strokeStyle = 'rgba(212,175,106,0.9)';
+      ctx.beginPath();
+      ctx.arc(activePuck.x, activePuck.y, PUCK_R+6, 0, Math.PI*2);
+      ctx.stroke();
+      ctx.restore();
+    }
   }
 
   function drawZone(yFrom, yTo, label, fill){

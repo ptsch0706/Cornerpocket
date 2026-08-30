@@ -79,7 +79,7 @@
   </div>
 
   <div id="tableWrap">
-    <canvas id="table" width="360" height="260"></canvas>
+    <canvas id="table" width="360" height="400"></canvas>
     <div id="overlay">
       <h2 id="overlayTitle">Game Over</h2>
       <p id="overlayText">Details here</p>
@@ -92,14 +92,14 @@
 
   <div id="aimPadWrap">
     <div id="aimPad"><div id="aimKnob"></div></div>
-    <div id="aimPadLabel">Drag toward the board, release to toss</div>
+    <div id="aimPadLabel">Pull back, release to toss toward the board</div>
   </div>
 
   <div class="help">
     4 bags each per round. Board = 1, hole = 3 — only the round's difference is awarded. First to 21 wins.
   </div>
 
-  <div id="appVersion">v1.1.2</div>
+  <div id="appVersion">v1.1.4</div>
 </div>
 
 <script src="shared.js"></script>
@@ -108,14 +108,14 @@
   "use strict";
 
   // ---------- CONFIG ----------
-  const CW = 360, CH = 260;
+  const CW = 360, CH = 400;
   const LANE_LEFT = 38, LANE_RIGHT = CW - 38;
-  const START_X = CW/2, START_Y = 230;
-  const MAX_DIST = 208;
+  const START_X = CW/2, START_Y = 354;
+  const MAX_DIST = 320;
 
   const BOARD_X0 = 95, BOARD_X1 = 265;
-  const BOARD_Y0 = 26, BOARD_Y1 = 85;
-  const HOLE_X = 180, HOLE_Y = 39, HOLE_R = 11;
+  const BOARD_Y0 = 40, BOARD_Y1 = 131;
+  const HOLE_X = 180, HOLE_Y = 60, HOLE_R = 17;
 
   const WIN_SCORE = 21;
   const THROW_DURATION_MS = 650;
@@ -214,8 +214,9 @@
     padEl: aimPad, knobEl: aimKnob, powerBarEl: powerBar,
     canShoot: canShoot,
     onRelease: (dx, dy, power) => {
-      const targetX = START_X + dx*power*MAX_DIST;
-      const targetY = START_Y + dy*power*MAX_DIST;
+      // pull-back convention: dx,dy is the pull direction; throw opposite.
+      const targetX = START_X + (-dx)*power*MAX_DIST;
+      const targetY = START_Y + (-dy)*power*MAX_DIST;
       beginFlight('player', targetX, targetY);
     }
   });
@@ -279,10 +280,10 @@
   function aiTakeThrow(){
     if(gameOver) return;
     const diff = difficultySel.value;
-    const jitterPx = diff==='easy' ? 23 : diff==='hard' ? 5 : 12;
+    const jitterPx = diff==='easy' ? 95 : diff==='hard' ? 34 : 62;
 
     const angle = Math.random()*Math.PI*2;
-    const rad = Math.random()*jitterPx;
+    const rad = Math.sqrt(Math.random())*jitterPx; // sqrt gives a true uniform-area scatter, not center-biased
     const targetX = HOLE_X + Math.cos(angle)*rad;
     const targetY = HOLE_Y + Math.sin(angle)*rad;
 
@@ -321,7 +322,7 @@
     bags.forEach(b => {
       ctx.save();
       ctx.translate(b.x, b.y);
-      ctx.beginPath(); ctx.ellipse(0,2,8,4,0,0,Math.PI*2);
+      ctx.beginPath(); ctx.ellipse(0,3,12,6,0,0,Math.PI*2);
       ctx.fillStyle = 'rgba(0,0,0,0.35)'; ctx.fill();
       drawBagShape(b.owner);
       ctx.restore();
@@ -332,14 +333,14 @@
       const t = Math.min(1, (performance.now() - flight.t0) / THROW_DURATION_MS);
       const x = flight.startX + (flight.targetX - flight.startX) * t;
       const y = flight.startY + (flight.targetY - flight.startY) * t;
-      const height = Math.sin(t * Math.PI) * 70; // peak arc height in px
+      const height = Math.sin(t * Math.PI) * 108; // peak arc height in px
       const scale = 1 + Math.sin(t*Math.PI) * 0.35;
 
       // ground shadow (shrinks as bag gets higher)
       ctx.save();
       ctx.translate(x, y);
       ctx.beginPath();
-      ctx.ellipse(0, 2, 8*(1-0.4*Math.sin(t*Math.PI)), 4*(1-0.4*Math.sin(t*Math.PI)), 0, 0, Math.PI*2);
+      ctx.ellipse(0, 3, 12*(1-0.4*Math.sin(t*Math.PI)), 6*(1-0.4*Math.sin(t*Math.PI)), 0, 0, Math.PI*2);
       ctx.fillStyle = 'rgba(0,0,0,0.3)'; ctx.fill();
       ctx.restore();
 
@@ -357,7 +358,7 @@
     ctx.strokeStyle = 'rgba(0,0,0,0.4)';
     ctx.lineWidth = 1.2;
     ctx.beginPath();
-    ctx.roundRect ? ctx.roundRect(-7,-5,14,10,3) : ctx.rect(-7,-5,14,10);
+    ctx.roundRect ? ctx.roundRect(-10,-7,20,14,4) : ctx.rect(-10,-7,20,14);
     ctx.fill(); ctx.stroke();
   }
 
