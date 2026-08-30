@@ -86,13 +86,15 @@
 
   <div id="aimPadWrap">
     <div id="aimPad"><div id="aimKnob"></div></div>
-    <div id="aimPadLabel">Pull back, release to throw</div>
+    <div id="aimPadLabel">Point at your target, pull hard, release</div>
   </div>
 
   <div class="help">
-    Pull back and release to throw, like drawing a slingshot. Standard 501: first to exactly 0
-    wins, but your last dart must land on a double (or the bullseye). Overshoot, land on 1, or
-    reach 0 without a double, and the whole turn is voided.
+    The pad's direction is where you're aiming — a small nudge toward center is a bullseye
+    attempt. How far you actually pull it is your throw's strength: pull all the way for a true
+    shot, or an under-pull lets gravity drag it low. Standard 501: first to exactly 0 wins, but
+    your last dart must land on a double (or the bullseye). Overshoot, land on 1, or reach 0
+    without a double, and the whole turn is voided.
   </div>
 
 </div>
@@ -169,6 +171,7 @@
   let state = 'aiming'; // 'aiming' | 'throwing' | 'ai-wait' | 'over'
   let gameOver = false;
   let flight = null; // in-flight dart animation: {owner,targetDX,targetDY,t0}
+  let livePreview = null; // {x,y} live aim+drop preview while dragging, before release
 
   const canvas = document.getElementById('table');
   const ctx = canvas.getContext('2d');
@@ -201,12 +204,13 @@
     dartsThisTurn = 0;
     turnMarks = [];
     flight = null;
+    livePreview = null;
     turnStartRemaining = remaining[turn];
     updateScoreDisplays();
     updatePanels();
     if(turn === 'player'){
       state = 'aiming';
-      setMessage("Your throw — pull back and release.");
+      setMessage("Your throw — drag toward your target.");
     } else {
       state = 'ai-wait';
       setMessage("Computer is throwing...");
@@ -215,8 +219,14 @@
     render();
   }
 
-  // ---------- AIM PAD: pull back and release, same convention as pool/shuffleboard/cornhole ----------
-  const MAX_OFFSET = R * 1.15;   // full-power distance from center a throw can reach
+  // ---------- AIM PAD: direction = where you're pointing, power = how hard you commit ----------
+  // The pad's direction (not how far you drag) sets your full-strength aim point — so a
+  // bullseye attempt just means pointing at the center, at any drag distance. Separately,
+  // how far you actually pull the pad is your throw's force: pull all the way and the dart
+  // flies true to your aim; pull weak and gravity drags it low, undershooting straight down
+  // from wherever you were aiming — same as a real underpowered throw.
+  const MAX_OFFSET = R * 1.15;   // full-strength distance from center a throw can reach
+  const DROP_MAX = R * 0.5;      // how far a bare-minimum-strength throw drops below the aim
   const THROW_DURATION_MS = 380; // quick flight — darts travel fast
   const LAUNCH_DX = 0, LAUNCH_DY = R * 1.35; // where the throw visually enters the scene, below the board
 
@@ -226,10 +236,14 @@
   Arcade.createAimPad({
     padEl: aimPad, knobEl: aimKnob, powerBarEl: powerBar,
     canShoot: canShoot,
+    onMove: (dx, dy, power) => {
+      livePreview = { x: dx*MAX_OFFSET, y: dy*MAX_OFFSET + (1-power)*DROP_MAX };
+      render();
+    },
     onRelease: (dx, dy, power) => {
-      // pull-back convention: dx,dy is the pull direction; throw opposite.
-      const targetDX = -dx * power * MAX_OFFSET;
-      const targetDY = -dy * power * MAX_OFFSET;
+      const targetDX = dx * MAX_OFFSET;
+      const targetDY = dy * MAX_OFFSET + (1-power) * DROP_MAX;
+      livePreview = null;
       beginDartFlight('player', targetDX, targetDY);
     }
   });
@@ -284,7 +298,7 @@
     } else if(turn === 'ai'){
       setTimeout(aiThrowDart, 750);
     } else {
-      state = 'aiming'; // player still has darts this turn — ready for the next pull-back
+      state = 'aiming'; // player still has darts this turn — ready for the next throw
     }
   }
 
@@ -335,22 +349,19 @@
   function aiThrowDart(){
     if(gameOver) return;
     const diff = difficultySel.value;
-    const aimJitterPx = diff==='easy' ? 100 : diff==='hard' ? 22 : 55;
-    const powerErrorFrac = diff==='easy' ? 0.42 : diff==='hard' ? 0.10 : 0.24;
+    const aimJitterPx = diff==='easy' ? 70 : diff==='hard' ? 16 : 40;
+    const underpullMax = diff==='easy' ? 0.65 : diff==='hard' ? 0.10 : 0.35; // how far below full strength the AI might pull
 
     const base = aiTargetFor(remaining.ai);
     const angle = Math.random() * Math.PI * 2;
     const rad = Math.sqrt(Math.random()) * aimJitterPx; // sqrt gives a true uniform-area scatter
-    const intendedDX = base.dx + Math.cos(angle)*rad;
-    const intendedDY = base.dy + Math.sin(angle)*rad;
+    const dx = base.dx + Math.cos(angle)*rad;
+    const dy = base.dy + Math.sin(angle)*rad;
 
-    const idealDist = Math.hypot(intendedDX, intendedDY);
-    const dirX = idealDist > 0 ? intendedDX/idealDist : 0;
-    const dirY = idealDist > 0 ? intendedDY/idealDist : -1;
-    const actualDist = idealDist * (1 + (Math.random()*2-1) * powerErrorFrac);
-    const dx = dirX*actualDist, dy = dirY*actualDist;
+    const power = 1 - Math.random() * underpullMax;
+    const drop = (1 - power) * DROP_MAX;
 
-    beginDartFlight('ai', dx, dy);
+    beginDartFlight('ai', dx, dy + drop);
   }
 
   // ---------- RENDER ----------
@@ -447,6 +458,18 @@
       ctx.translate(x, y);
       ctx.scale(scale, scale);
       drawDartMarker();
+      ctx.restore();
+    }
+
+    // live preview while dragging: where it'll land right now, given current aim + pull strength
+    if(livePreview){
+      ctx.save();
+      ctx.translate(livePreview.x, livePreview.y);
+      ctx.strokeStyle = 'rgba(255,255,255,0.8)';
+      ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.moveTo(-11,0); ctx.lineTo(11,0); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(0,-11); ctx.lineTo(0,11); ctx.stroke();
+      ctx.beginPath(); ctx.arc(0,0,6,0,Math.PI*2); ctx.stroke();
       ctx.restore();
     }
 
