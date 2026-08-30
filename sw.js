@@ -1,9 +1,9 @@
 // Corner Pocket — service worker
 //
 // IMPORTANT: bump CACHE_NAME every time you push a new version (keep it in sync
-// with the "v0.0.1" shown at the bottom of index.html). Changing this string is
+// with the "v0.0.2" shown at the bottom of index.html). Changing this string is
 // what tells the service worker "this is new content, throw out the old cache."
-const CACHE_NAME = 'corner-pocket-v0.0.1';
+const CACHE_NAME = 'corner-pocket-v0.0.2';
 
 const CORE_ASSETS = [
   './',
