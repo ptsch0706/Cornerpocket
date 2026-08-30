@@ -62,7 +62,7 @@
   </div>
 
   <div id="tableWrap">
-    <canvas id="table" width="380" height="700"></canvas>
+    <canvas id="table" width="360" height="500"></canvas>
     <div id="overlay">
       <h2 id="overlayTitle">Game Over</h2>
       <p id="overlayText">Details here</p>
@@ -83,7 +83,7 @@
     between each round's totals is awarded — to whoever scored more. First to 21 (or more) wins.
   </div>
 
-  <div id="appVersion">v1.0.1</div>
+  <div id="appVersion">v1.1.0</div>
 </div>
 
 <script src="shared.js"></script>
@@ -92,14 +92,14 @@
   "use strict";
 
   // ---------- CONFIG ----------
-  const CW = 380, CH = 700;
-  const LANE_LEFT = 40, LANE_RIGHT = CW - 40;
-  const START_X = CW/2, START_Y = 630;
-  const MAX_DIST = 560;
+  const CW = 360, CH = 500;
+  const LANE_LEFT = 38, LANE_RIGHT = CW - 38;
+  const START_X = CW/2, START_Y = 450;
+  const MAX_DIST = 400;
 
-  const BOARD_X0 = 100, BOARD_X1 = 280;
-  const BOARD_Y0 = 70, BOARD_Y1 = 230;
-  const HOLE_X = 190, HOLE_Y = 105, HOLE_R = 27;
+  const BOARD_X0 = 95, BOARD_X1 = 265;
+  const BOARD_Y0 = 50, BOARD_Y1 = 164;
+  const HOLE_X = 180, HOLE_Y = 75, HOLE_R = 22;
 
   const WIN_SCORE = 21;
   const THROW_DURATION_MS = 650;
@@ -263,7 +263,7 @@
   function aiTakeThrow(){
     if(gameOver) return;
     const diff = difficultySel.value;
-    const jitterPx = diff==='easy' ? 58 : diff==='hard' ? 12 : 30;
+    const jitterPx = diff==='easy' ? 44 : diff==='hard' ? 9 : 23;
 
     const angle = Math.random()*Math.PI*2;
     const rad = Math.random()*jitterPx;

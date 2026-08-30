@@ -509,7 +509,7 @@
     Potting the cue ball or the 8-ball early costs you the game.
   </div>
 
-  <div id="appVersion">v1.0.1</div>
+  <div id="appVersion">v1.1.0</div>
 </div>
 
 <script>
@@ -880,6 +880,21 @@
   }
 
   // ---------- PHYSICS ----------
+  const POCKET_GAP_HALF_WIDTH = 26; // cushions don't clamp the ball within this distance of a pocket mouth
+  const RAIL_SAFETY_MARGIN = 42;    // outer fallback bound so a missed pocket can't fly off-canvas forever
+
+  function nearPocketGapX(x){
+    // relevant to the TOP/BOTTOM cushions, which run along the x-axis
+    return Math.abs(x-LEFT) < POCKET_GAP_HALF_WIDTH ||
+           Math.abs(x-RIGHT) < POCKET_GAP_HALF_WIDTH ||
+           Math.abs(x-CW/2) < POCKET_GAP_HALF_WIDTH;
+  }
+  function nearPocketGapY(y){
+    // relevant to the LEFT/RIGHT cushions, which run along the y-axis
+    return Math.abs(y-TOP) < POCKET_GAP_HALF_WIDTH ||
+           Math.abs(y-BOTTOM) < POCKET_GAP_HALF_WIDTH;
+  }
+
   function allStopped(){
     return balls.every(b => b.potted || (Math.abs(b.vx) < 0.001 && Math.abs(b.vy) < 0.001));
   }
@@ -901,7 +916,7 @@
       let caughtByPocket = false;
       for(const p of POCKETS){
         const d = Math.hypot(b.x-p.x, b.y-p.y);
-        const catchRadius = p.r - b.r*0.3; // ball must be mostly over the mouth, not just near the rim
+        const catchRadius = p.r - b.r*0.15; // generous — ball just needs to be mostly over the mouth
         if(d < catchRadius){
           b.potted = true;
           b.vx = 0; b.vy = 0;
@@ -916,10 +931,21 @@
       }
       if(caughtByPocket) return;
 
-      if(b.x - b.r < LEFT){ b.x = LEFT + b.r; b.vx = -b.vx*WALL_REST; }
-      if(b.x + b.r > RIGHT){ b.x = RIGHT - b.r; b.vx = -b.vx*WALL_REST; }
-      if(b.y - b.r < TOP){ b.y = TOP + b.r; b.vy = -b.vy*WALL_REST; }
-      if(b.y + b.r > BOTTOM){ b.y = BOTTOM - b.r; b.vy = -b.vy*WALL_REST; }
+      // Cushions have real gaps at each pocket mouth — a ball rolling along a rail
+      // toward a pocket (a very common shot, especially shallow-angle ones) should
+      // sail through into the pocket-capture check above instead of bouncing off
+      // an invisible wall that has no gap in real life.
+      if(b.x - b.r < LEFT && !nearPocketGapY(b.y)){ b.x = LEFT + b.r; b.vx = -b.vx*WALL_REST; }
+      if(b.x + b.r > RIGHT && !nearPocketGapY(b.y)){ b.x = RIGHT - b.r; b.vx = -b.vx*WALL_REST; }
+      if(b.y - b.r < TOP && !nearPocketGapX(b.x)){ b.y = TOP + b.r; b.vy = -b.vy*WALL_REST; }
+      if(b.y + b.r > BOTTOM && !nearPocketGapX(b.x)){ b.y = BOTTOM - b.r; b.vy = -b.vy*WALL_REST; }
+
+      // Safety net: if a ball passes through a gap without being potted (e.g. it
+      // "jaws out"), still stop it from flying off the table forever.
+      if(b.x < LEFT-RAIL_SAFETY_MARGIN){ b.x = LEFT-RAIL_SAFETY_MARGIN; b.vx = Math.abs(b.vx)*WALL_REST; }
+      if(b.x > RIGHT+RAIL_SAFETY_MARGIN){ b.x = RIGHT+RAIL_SAFETY_MARGIN; b.vx = -Math.abs(b.vx)*WALL_REST; }
+      if(b.y < TOP-RAIL_SAFETY_MARGIN){ b.y = TOP-RAIL_SAFETY_MARGIN; b.vy = Math.abs(b.vy)*WALL_REST; }
+      if(b.y > BOTTOM+RAIL_SAFETY_MARGIN){ b.y = BOTTOM+RAIL_SAFETY_MARGIN; b.vy = -Math.abs(b.vy)*WALL_REST; }
     });
 
     for(let i=0;i<balls.length;i++){

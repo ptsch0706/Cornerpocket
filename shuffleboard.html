@@ -62,7 +62,7 @@
   </div>
 
   <div id="tableWrap">
-    <canvas id="table" width="380" height="700"></canvas>
+    <canvas id="table" width="360" height="500"></canvas>
     <div id="overlay">
       <h2 id="overlayTitle">Game Over</h2>
       <p id="overlayText">Details here</p>
@@ -83,7 +83,7 @@
     and only for each of their own pucks that beats the opponent's best. First to 21 wins the match.
   </div>
 
-  <div id="appVersion">v1.0.1</div>
+  <div id="appVersion">v1.1.0</div>
 </div>
 
 <script src="shared.js"></script>
@@ -92,21 +92,21 @@
   "use strict";
 
   // ---------- CONFIG ----------
-  const CW = 380, CH = 700;
-  const LANE_LEFT = 68, LANE_RIGHT = CW - 68;
-  const PUCK_R = 15;
+  const CW = 360, CH = 500;
+  const LANE_LEFT = 64, LANE_RIGHT = CW - 64;
+  const PUCK_R = 13;
   const FRICTION = 0.99;
   const STOP_SPEED = 0.05;
-  const MAX_SPEED = 10;
+  const MAX_SPEED = 7;
 
-  const LANE_START_Y = 645;   // where a fresh puck is placed to be shot
-  const BOTTOM_DEAD_Y = 685;  // knocked back past here = off the near end
-  const FOUL_LINE_Y = 560;    // must cross this to score anything
-  const ZONE1_END_Y = 460;    // [460,560) = zone 1
-  const ZONE2_END_Y = 360;    // [360,460) = zone 2
-  const ZONE3_END_Y = 260;    // [260,360) = zone 3
-  const ZONE4_END_Y = 150;    // [150,260) = zone 4 ("hanging")
-  const OFF_EDGE_Y = 150;     // below this = fell off the far edge
+  const LANE_START_Y = 460;   // where a fresh puck is placed to be shot
+  const BOTTOM_DEAD_Y = 489;  // knocked back past here = off the near end
+  const FOUL_LINE_Y = 400;    // must cross this to score anything
+  const ZONE1_END_Y = 329;    // [329,400) = zone 1
+  const ZONE2_END_Y = 257;    // [257,329) = zone 2
+  const ZONE3_END_Y = 186;    // [186,257) = zone 3
+  const ZONE4_END_Y = 107;    // [107,186) = zone 4 ("hanging")
+  const OFF_EDGE_Y = 107;     // below this = fell off the far edge
 
   const WIN_SCORE = 21;
 
@@ -341,7 +341,7 @@
   function aiTakeShot(){
     if(gameOver) return;
     const diff = difficultySel.value;
-    const errorPx = diff==='easy' ? 42 : diff==='hard' ? 6 : 20;
+    const errorPx = diff==='easy' ? 30 : diff==='hard' ? 5 : 14;
     const powerNoise = diff==='easy' ? 0.20 : diff==='hard' ? 0.04 : 0.11;
 
     // figure out if the opponent currently holds the lead and is worth knocking
@@ -355,7 +355,7 @@
       target = { x: alive[0].p.x, y: alive[0].p.y - 8 }; // aim slightly past its center for a clean hit through
     } else {
       // lay up in the best zone (aim for the hang zone, with a little room to spare)
-      target = { x: laneCenterX() + (Math.random()*2-1)*20, y: ZONE4_END_Y + 55 };
+      target = { x: laneCenterX() + (Math.random()*2-1)*14, y: ZONE4_END_Y + 40 };
     }
 
     target.x += (Math.random()*2-1) * errorPx;

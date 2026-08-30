@@ -19,6 +19,17 @@
   }
   .darts-pips .pip.used { background:#d4af6a; border-color:#a9853c; }
   .score-panel .big { font-size:22px; font-weight:700; color:#e9d9a8; line-height:1.1; margin-top:2px; }
+  #powerWrap { position: relative; }
+  #idealTick {
+    position: absolute;
+    top: -3px;
+    width: 2px;
+    height: 14px;
+    background: #fff;
+    opacity: 0;
+    transform: translateX(-1px);
+    pointer-events: none;
+  }
 </style>
 </head>
 <body>
@@ -82,20 +93,21 @@
   </div>
 
   <div id="message">Loading...</div>
-  <div id="powerWrap"><div id="powerBar"></div></div>
+  <div id="powerWrap"><div id="powerBar"></div><div id="idealTick"></div></div>
 
   <div id="aimPadWrap">
     <div id="aimPad"><div id="aimKnob"></div></div>
-    <div id="aimPadLabel">Drag toward where you want to throw — release to let go</div>
+    <div id="aimPadLabel">Step 1: drag to aim, release to lock it in</div>
   </div>
 
   <div class="help">
-    Standard 501: start at 501, first to exactly 0 wins — but your very last dart must land on a
-    double (or the bullseye). Overshoot, land on 1, or reach 0 without a double, and the whole
-    turn's score is voided.
+    Two-step throw: drag to aim and release to lock in your target, then pull back and release
+    with the right force — too soft or too hard and the dart lands short or long of your mark.
+    Standard 501: first to exactly 0 wins, but your last dart must land on a double (or the
+    bullseye). Overshoot, land on 1, or reach 0 without a double, and the whole turn is voided.
   </div>
 
-  <div id="appVersion">v1.0.1</div>
+  <div id="appVersion">v1.1.0</div>
 </div>
 
 <script src="shared.js"></script>
@@ -169,6 +181,8 @@
   let turnMarks = []; // {dx,dy} landing points thrown this turn, for display
   let state = 'aiming'; // 'aiming' | 'ai-wait' | 'over'
   let gameOver = false;
+  let throwPhase = 'aim'; // 'aim' | 'power' — two-step throw: aim a point, then pull back for power
+  let aimPreview = null;  // {dx,dy} the currently-aimed point (offset from board center)
 
   const canvas = document.getElementById('table');
   const ctx = canvas.getContext('2d');
@@ -186,6 +200,8 @@
   const difficultySel = document.getElementById('difficulty');
   const aimPad = document.getElementById('aimPad');
   const aimKnob = document.getElementById('aimKnob');
+  const aimPadLabel = document.getElementById('aimPadLabel');
+  const idealTick = document.getElementById('idealTick');
 
   function setMessage(t){ messageEl.textContent = t; }
 
@@ -200,12 +216,16 @@
   function beginTurn(){
     dartsThisTurn = 0;
     turnMarks = [];
+    throwPhase = 'aim';
+    aimPreview = null;
+    idealTick.style.opacity = '0';
     turnStartRemaining = remaining[turn];
     updateScoreDisplays();
     updatePanels();
     if(turn === 'player'){
       state = 'aiming';
-      setMessage("Your throw — drag toward your target.");
+      setMessage("Your throw — drag to aim.");
+      aimPadLabel.textContent = "Step 1: drag to aim, release to lock it in";
     } else {
       state = 'ai-wait';
       setMessage("Computer is throwing...");
@@ -214,16 +234,47 @@
     render();
   }
 
-  // ---------- AIM PAD (direct aim-offset convention, not pull-back) ----------
-  const MAX_OFFSET = R * 1.15; // dragging to full power can throw slightly off the board
+  // ---------- AIM PAD: two-phase throw ----------
+  // Phase 1 ("aim"): drag to a point on the board and release to lock in your target.
+  // Phase 2 ("power"): pull back and release — direction is ignored here, only how
+  // hard you pull matters. Pull too soft or too hard relative to the locked target's
+  // distance and the dart lands short of or beyond it, along the same line — that
+  // mismatch is the "arc": a real throw needs the right force to reach where you're
+  // aiming, not just the right direction.
+  const MAX_OFFSET = R * 1.15; // full-power distance from center a throw can reach
   function canShoot(){
     return turn === 'player' && state === 'aiming' && !gameOver;
   }
   Arcade.createAimPad({
     padEl: aimPad, knobEl: aimKnob, powerBarEl: powerBar,
     canShoot: canShoot,
+    onMove: (dx, dy, power) => {
+      if(throwPhase !== 'aim') return;
+      aimPreview = { dx: dx*power*MAX_OFFSET, dy: dy*power*MAX_OFFSET };
+      render();
+    },
     onRelease: (dx, dy, power) => {
-      throwDart(dx * power * MAX_OFFSET, dy * power * MAX_OFFSET);
+      if(throwPhase === 'aim'){
+        aimPreview = { dx: dx*power*MAX_OFFSET, dy: dy*power*MAX_OFFSET };
+        throwPhase = 'power';
+        const idealPower = Math.min(1, Math.hypot(aimPreview.dx, aimPreview.dy) / MAX_OFFSET);
+        idealTick.style.left = (idealPower*100).toFixed(1) + '%';
+        idealTick.style.opacity = '1';
+        setMessage("Target locked — now pull back and release to throw!");
+        aimPadLabel.textContent = "Step 2: pull back, release with the right force";
+        render();
+      } else {
+        const idealDist = Math.hypot(aimPreview.dx, aimPreview.dy);
+        const dirX = idealDist > 0 ? aimPreview.dx/idealDist : 0;
+        const dirY = idealDist > 0 ? aimPreview.dy/idealDist : -1;
+        const actualDist = power * MAX_OFFSET;
+        const finalDX = dirX*actualDist, finalDY = dirY*actualDist;
+        throwPhase = 'aim';
+        aimPreview = null;
+        idealTick.style.opacity = '0';
+        aimPadLabel.textContent = "Step 1: drag to aim, release to lock it in";
+        throwDart(finalDX, finalDY);
+      }
     }
   });
 
@@ -320,13 +371,20 @@
   function aiThrowDart(){
     if(gameOver) return;
     const diff = difficultySel.value;
-    const jitterPx = diff==='easy' ? 34 : diff==='hard' ? 7 : 17;
+    const aimJitterPx = diff==='easy' ? 34 : diff==='hard' ? 7 : 17;
+    const powerErrorFrac = diff==='easy' ? 0.30 : diff==='hard' ? 0.05 : 0.15;
 
     const base = aiTargetFor(remaining.ai);
     const angle = Math.random() * Math.PI * 2;
-    const rad = Math.random() * jitterPx;
-    const dx = base.dx + Math.cos(angle)*rad;
-    const dy = base.dy + Math.sin(angle)*rad;
+    const rad = Math.random() * aimJitterPx;
+    const intendedDX = base.dx + Math.cos(angle)*rad;
+    const intendedDY = base.dy + Math.sin(angle)*rad;
+
+    const idealDist = Math.hypot(intendedDX, intendedDY);
+    const dirX = idealDist > 0 ? intendedDX/idealDist : 0;
+    const dirY = idealDist > 0 ? intendedDY/idealDist : -1;
+    const actualDist = idealDist * (1 + (Math.random()*2-1) * powerErrorFrac);
+    const dx = dirX*actualDist, dy = dirY*actualDist;
 
     turnMarks.push({ dx, dy });
     render();
@@ -411,6 +469,18 @@
       ctx.strokeStyle = 'rgba(0,0,0,0.6)'; ctx.lineWidth = 1; ctx.stroke();
       ctx.restore();
     });
+
+    // aim reticle: live while dragging in phase 1, frozen in place during phase 2
+    if(aimPreview){
+      ctx.save();
+      ctx.translate(aimPreview.dx, aimPreview.dy);
+      ctx.strokeStyle = throwPhase === 'power' ? 'rgba(212,175,106,0.95)' : 'rgba(255,255,255,0.8)';
+      ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.moveTo(-11,0); ctx.lineTo(11,0); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(0,-11); ctx.lineTo(0,11); ctx.stroke();
+      ctx.beginPath(); ctx.arc(0,0,6,0,Math.PI*2); ctx.stroke();
+      ctx.restore();
+    }
 
     ctx.restore();
   }
