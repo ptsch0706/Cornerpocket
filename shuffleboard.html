@@ -62,6 +62,7 @@
         <option value="medium" selected>Medium</option>
         <option value="hard">Hard</option>
       </select>
+      <button class="primary" id="settingsNewGameBtn">New Game</button>
       <button id="resetStats">Reset record</button>
     </div>
   </div>
@@ -157,6 +158,10 @@
   });
   renderStats();
   Arcade.wireSettingsModal('settingsBtn', 'settingsModal', 'settingsCloseBtn');
+  document.getElementById('settingsNewGameBtn').addEventListener('click', () => {
+    document.getElementById('settingsModal').classList.remove('open');
+    startMatch();
+  });
 
   const coinFlip = Arcade.createCoinFlip({
     overlayId: 'coinOverlay', coinId: 'coin', promptId: 'coinPrompt',

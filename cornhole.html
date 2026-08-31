@@ -62,6 +62,7 @@
         <option value="medium" selected>Medium</option>
         <option value="hard">Hard</option>
       </select>
+      <button class="primary" id="settingsNewGameBtn">New Game</button>
       <button id="resetStats">Reset record</button>
     </div>
   </div>
@@ -123,10 +124,26 @@
   const LANE_LEFT = 38, LANE_RIGHT = CW - 38;
   const START_X = CW/2, START_Y = 354;
   const MAX_DIST = 320;
+  const FIELD_X = LANE_LEFT - 10, FIELD_Y = 6;
+  const FIELD_W = (LANE_RIGHT - LANE_LEFT) + 20, FIELD_H = CH - 12;
+
+  // grass blade texture, generated once so it reads as a stable lawn instead of flickering noise
+  const GRASS_BLADE_COUNT = 130;
+  const grassBlades = [];
+  for(let i=0; i<GRASS_BLADE_COUNT; i++){
+    grassBlades.push({
+      x: FIELD_X + Math.random()*FIELD_W,
+      y: FIELD_Y + Math.random()*FIELD_H,
+      len: 3 + Math.random()*3,
+      angle: -Math.PI/2 + (Math.random()*0.7 - 0.35),
+      light: Math.random() < 0.5
+    });
+  }
 
   const BOARD_X0 = 95, BOARD_X1 = 265;
   const BOARD_Y0 = 40, BOARD_Y1 = 131;
   const HOLE_X = 180, HOLE_Y = 60, HOLE_R = 17;
+  const HOLE_SQUASH = 0.58; // hole's vertical radius as a fraction of its horizontal radius — matches the board's tilt
   const BOARD_INSET = 22; // px the far/top edge is narrower than the near/bottom edge — sells perspective
   const BOARD_LIP = 10;   // px height of the board's visible front edge (its raised thickness)
 
@@ -144,9 +161,15 @@
     return x >= xLeft && x <= xRight;
   }
 
+  /** True if (x,y) falls within the hole's elliptical footprint (matches its tilted, squashed shape). */
+  function isInHole(x, y){
+    const nx = (x - HOLE_X) / HOLE_R;
+    const ny = (y - HOLE_Y) / (HOLE_R * HOLE_SQUASH);
+    return (nx*nx + ny*ny) <= 1;
+  }
+
   function resultForLanding(x, y){
-    const dHole = Math.hypot(x-HOLE_X, y-HOLE_Y);
-    if(dHole <= HOLE_R) return { value: 3, label: 'In the hole!' };
+    if(isInHole(x, y)) return { value: 3, label: 'In the hole!' };
     if(isOnBoard(x, y)) return { value: 1, label: 'On the board.' };
     return { value: 0, label: 'Missed — in the dirt.' };
   }
@@ -162,6 +185,10 @@
   });
   renderStats();
   Arcade.wireSettingsModal('settingsBtn', 'settingsModal', 'settingsCloseBtn');
+  document.getElementById('settingsNewGameBtn').addEventListener('click', () => {
+    document.getElementById('settingsModal').classList.remove('open');
+    startMatch();
+  });
 
   const coinFlip = Arcade.createCoinFlip({
     overlayId: 'coinOverlay', coinId: 'coin', promptId: 'coinPrompt',
@@ -356,14 +383,46 @@
     ctx.lineWidth = 1;
     ctx.strokeRect(3,3,CW-6,CH-6);
 
-    // field — felt green, matching Corner Pocket's table instead of literal grass
-    const ground = ctx.createRadialGradient(CW/2,CH*0.4,20, CW/2,CH*0.4,CH*0.9);
-    ground.addColorStop(0,'#1a7d4a'); ground.addColorStop(1,'#0d5232');
+    // field — a real grass yard: mowed-lawn stripes, blade texture, and a worn patch by the board
+    const ground = ctx.createRadialGradient(CW/2,CH*0.35,20, CW/2,CH*0.35,CH*0.95);
+    ground.addColorStop(0,'#4d8f3c'); ground.addColorStop(1,'#2b5a26');
     ctx.fillStyle = ground;
-    ctx.fillRect(LANE_LEFT-10, 6, (LANE_RIGHT-LANE_LEFT)+20, CH-12);
-    ctx.strokeStyle = 'rgba(0,0,0,0.25)';
+    ctx.fillRect(FIELD_X, FIELD_Y, FIELD_W, FIELD_H);
+
+    ctx.save();
+    ctx.beginPath(); ctx.rect(FIELD_X, FIELD_Y, FIELD_W, FIELD_H); ctx.clip();
+
+    // mowed-lawn stripes, alternating light/dark bands like a real cut lawn
+    const stripeH = 24;
+    for(let y = FIELD_Y, i = 0; y < FIELD_Y + FIELD_H; y += stripeH, i++){
+      ctx.fillStyle = (i % 2 === 0) ? 'rgba(255,255,255,0.055)' : 'rgba(0,0,0,0.07)';
+      ctx.fillRect(FIELD_X, y, FIELD_W, stripeH);
+    }
+
+    // worn dirt patch where bags keep landing, just in front of the board
+    const wearGrad = ctx.createRadialGradient((BOARD_X0+BOARD_X1)/2, BOARD_Y1+10, 4, (BOARD_X0+BOARD_X1)/2, BOARD_Y1+10, 62);
+    wearGrad.addColorStop(0,'rgba(126,94,52,0.4)');
+    wearGrad.addColorStop(1,'rgba(126,94,52,0)');
+    ctx.fillStyle = wearGrad;
+    ctx.fillRect(FIELD_X, FIELD_Y, FIELD_W, FIELD_H);
+
+    // grass blade texture — small stable strokes, not regenerated each frame
+    ctx.strokeStyle = 'rgba(0,0,0,0.16)';
+    ctx.lineWidth = 1;
+    grassBlades.forEach(b => {
+      if(b.light) ctx.strokeStyle = 'rgba(255,255,255,0.14)';
+      else ctx.strokeStyle = 'rgba(0,0,0,0.16)';
+      ctx.beginPath();
+      ctx.moveTo(b.x, b.y);
+      ctx.lineTo(b.x + Math.cos(b.angle)*b.len, b.y + Math.sin(b.angle)*b.len);
+      ctx.stroke();
+    });
+
+    ctx.restore();
+
+    ctx.strokeStyle = 'rgba(0,0,0,0.3)';
     ctx.lineWidth = 2;
-    ctx.strokeRect(LANE_LEFT-10, 6, (LANE_RIGHT-LANE_LEFT)+20, CH-12);
+    ctx.strokeRect(FIELD_X, FIELD_Y, FIELD_W, FIELD_H);
 
     // lane guide lines (cosmetic, gold-tinted to match the rest of the app)
     ctx.strokeStyle = 'rgba(212,175,106,0.35)';
@@ -414,13 +473,13 @@
     ctx.fill();
     ctx.strokeStyle = 'rgba(0,0,0,0.4)'; ctx.lineWidth = 2.5; ctx.stroke();
 
-    // hole — recessed cut into the wood, not just a flat circle
-    ctx.beginPath(); ctx.arc(HOLE_X, HOLE_Y, HOLE_R*1.3, 0, Math.PI*2);
+    // hole — a tilted ellipse (not a circle), matching how a real hole would look on an angled board
+    ctx.beginPath(); ctx.ellipse(HOLE_X, HOLE_Y, HOLE_R*1.3, HOLE_R*1.3*HOLE_SQUASH, 0, 0, Math.PI*2);
     ctx.fillStyle = 'rgba(0,0,0,0.32)'; ctx.fill();
-    ctx.beginPath(); ctx.arc(HOLE_X, HOLE_Y, HOLE_R, 0, Math.PI*2);
+    ctx.beginPath(); ctx.ellipse(HOLE_X, HOLE_Y, HOLE_R, HOLE_R*HOLE_SQUASH, 0, 0, Math.PI*2);
     ctx.fillStyle = '#0a0a0a'; ctx.fill();
     ctx.strokeStyle = 'rgba(0,0,0,0.6)'; ctx.lineWidth = 2; ctx.stroke();
-    ctx.beginPath(); ctx.arc(HOLE_X, HOLE_Y, HOLE_R-0.5, Math.PI*0.78, Math.PI*1.3);
+    ctx.beginPath(); ctx.ellipse(HOLE_X, HOLE_Y, HOLE_R-0.5, (HOLE_R-0.5)*HOLE_SQUASH, 0, Math.PI*0.78, Math.PI*1.3);
     ctx.strokeStyle = 'rgba(255,255,255,0.14)'; ctx.lineWidth = 1.4; ctx.stroke();
 
     // resting bags (on board or in the dirt) — draw shadow + bag flat on the ground
@@ -489,9 +548,8 @@
       slide.vx *= SLIDE_FRICTION; slide.vy *= SLIDE_FRICTION;
       render();
 
-      const dHole = Math.hypot(slide.x-HOLE_X, slide.y-HOLE_Y);
       const speed = Math.hypot(slide.vx, slide.vy);
-      if(dHole <= HOLE_R){
+      if(isInHole(slide.x, slide.y)){
         const owner = slide.owner;
         slide = null;
         finalizeBagLanding(owner, HOLE_X, HOLE_Y, { value: 3, label: 'Slid into the hole!' });

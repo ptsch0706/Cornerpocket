@@ -66,8 +66,8 @@
     pointer-events: none;
   }
   #powerMeter {
-    width: 56px;
-    height: 130px;
+    width: 116px;
+    height: 116px;
     border-radius: 10px;
     border: 2px solid #3a3327;
     background: linear-gradient(180deg, #4a9d5c 0%, #d4af6a 55%, #c0453f 100%);
@@ -77,13 +77,21 @@
     transition: opacity 0.2s;
   }
   #powerMeter.disabled { opacity: 0.3; }
+  #powerMeter::before {
+    content: "";
+    position: absolute;
+    left: 50%; top: 0; bottom: 0;
+    width: 1px;
+    background: rgba(255,255,255,0.3);
+  }
   #powerMeterMarker {
     position: absolute;
-    left: 0; right: 0;
-    height: 4px;
+    width: 15px; height: 15px;
+    border-radius: 50%;
     background: #fff;
-    box-shadow: 0 0 4px rgba(0,0,0,0.7);
-    top: 50%;
+    box-shadow: 0 0 5px rgba(0,0,0,0.75);
+    left: 50%; top: 50%;
+    transform: translate(-50%,-50%);
   }
 </style>
 </head>
@@ -121,6 +129,7 @@
         <option value="medium" selected>Medium</option>
         <option value="hard">Hard</option>
       </select>
+      <button class="primary" id="settingsNewGameBtn">New Game</button>
       <button id="resetStats">Reset record</button>
     </div>
   </div>
@@ -169,17 +178,17 @@
     </div>
     <div class="ctrl-col">
       <div id="powerMeter"><div id="powerMeterMarker"></div></div>
-      <div class="ctrl-label">Tap to lock power</div>
+      <div class="ctrl-label">Tap to lock power & drift</div>
     </div>
   </div>
 
   <div class="help">
     Left stick sets where you're aiming — it stays put once you let go, so line it up first.
-    The right bar bounces between weak and full power on its own; tap it at the moment you
-    want to commit. A full-power tap throws true to your aim; tapping early or late under-commits
-    and gravity drags the dart low. Standard 501: first to exactly 0 wins, but your last dart
-    must land on a double (or the bullseye). Overshoot, land on 1, or reach 0 without a double,
-    and the whole turn is voided.
+    The right dot bounces on its own, both up-down and side-to-side on different cycles — tap it
+    at the moment you want to commit. Dead center and at the top throws true to your aim; off to
+    a side drifts the dart that way, and lower than the top lets gravity drag it down. Standard
+    501: first to exactly 0 wins, but your last dart must land on a double (or the bullseye).
+    Overshoot, land on 1, or reach 0 without a double, and the whole turn is voided.
   </div>
 
 </div>
@@ -246,6 +255,10 @@
   });
   renderStats();
   Arcade.wireSettingsModal('settingsBtn', 'settingsModal', 'settingsCloseBtn');
+  document.getElementById('settingsNewGameBtn').addEventListener('click', () => {
+    document.getElementById('settingsModal').classList.remove('open');
+    startMatch();
+  });
 
   const coinFlip = Arcade.createCoinFlip({
     overlayId: 'coinOverlay', coinId: 'coin', promptId: 'coinPrompt',
@@ -319,17 +332,22 @@
     render();
   }
 
-  // ---------- CONTROLS: aim stick (persistent, no spring-back) + power meter (tap to lock) ----------
+  // ---------- CONTROLS: aim stick (persistent, no spring-back) + 2D power/drift meter (tap to lock) ----------
   // The stick sets direction only — full strength, immediately, and it stays wherever you left
   // it rather than snapping back, since aiming and throwing are now two separate actions. The
-  // power meter bounces on its own; tapping it captures whatever strength it's at that instant
-  // and throws right then. Full power throws true; anything less lets gravity drag it low.
+  // meter has a dot that bounces both vertically (power) and horizontally (drift) on its own,
+  // each on a different cycle so the combined motion never repeats simply. One tap locks both
+  // at once: full power (top) throws true vertically; anything less lets gravity drag it low.
+  // Dead center horizontally is zero drift; tapping while the dot is off-center left or right
+  // throws wide in that direction, same idea as the vertical drop but sideways.
   const MAX_OFFSET = R * 1.15;    // full-strength distance from center a throw can reach
   const DROP_MAX = R * 0.5;       // how far a zero-strength tap drops below the aim
+  const DRIFT_MAX = R * 0.4;      // how far an off-center tap drifts left/right of the aim
   const THROW_DURATION_MS = 380;  // quick flight — darts travel fast
   const LAUNCH_DX = 0, LAUNCH_DY = R * 1.35; // where the throw visually enters the scene, below the board
   const STICK_RADIUS_FRAC = 0.42; // fraction of the stick's own radius the knob can travel
-  const POWER_PERIOD_MS = 950;    // full bounce cycle of the power meter
+  const POWER_PERIOD_MS = 950;    // full vertical bounce cycle
+  const DRIFT_PERIOD_MS = 740;    // full horizontal bounce cycle — different period than power on purpose
 
   function canShoot(){
     return turn === 'player' && state === 'aiming' && !gameOver;
@@ -338,6 +356,11 @@
   function currentPowerLevel(){
     const t = (performance.now() % POWER_PERIOD_MS) / POWER_PERIOD_MS;
     return t < 0.5 ? t*2 : 2 - t*2; // 0 -> 1 -> 0, bouncing
+  }
+
+  function currentDriftLevel(){
+    const t = (performance.now() % DRIFT_PERIOD_MS) / DRIFT_PERIOD_MS;
+    return t < 0.5 ? t*2 : 2 - t*2; // 0 -> 1 -> 0, bouncing, on its own independent cycle
   }
 
   // --- aim stick: drag to set direction; releasing leaves it in place ---
@@ -390,7 +413,9 @@
     if(!canShoot()) return;
     evt.preventDefault();
     const power = currentPowerLevel();
-    const targetDX = aimX;
+    const driftT = currentDriftLevel(); // 0=full left, 0.5=centered/no drift, 1=full right
+    const drift = (driftT - 0.5) * 2 * DRIFT_MAX;
+    const targetDX = aimX + drift;
     const targetDY = aimY + (1 - power) * DROP_MAX;
     beginDartFlight('player', targetDX, targetDY);
   }
@@ -662,7 +687,9 @@
     powerMeter.classList.toggle('disabled', !shootable);
     if(shootable){
       const level = currentPowerLevel();
+      const drift = currentDriftLevel();
       powerMeterMarker.style.top = ((1 - level) * 100).toFixed(1) + '%';
+      powerMeterMarker.style.left = (drift * 100).toFixed(1) + '%';
     }
     requestAnimationFrame(loop);
   }

@@ -442,9 +442,17 @@
         <span>Settings</span>
         <button id="settingsCloseBtn" aria-label="Close">&times;</button>
       </div>
+      <label for="difficulty">Computer skill</label>
+      <select id="difficulty">
+        <option value="easy">Easy</option>
+        <option value="medium" selected>Medium</option>
+        <option value="hard">Hard</option>
+      </select>
+      <button class="primary" id="settingsNewGameBtn">New Game</button>
       <button id="resetStats">Reset record</button>
     </div>
   </div>
+
 
   <div class="scoreboard">
     <div class="score-panel" id="playerPanel">
@@ -485,16 +493,6 @@
   <div id="aimPadWrap">
     <div id="aimPad"><div id="aimKnob"></div></div>
     <div id="aimPadLabel">Drag to pull the cue back — release to shoot</div>
-  </div>
-
-  <div class="controls">
-    <label for="difficulty" style="font-size:13px;color:#a89d89;">Skill:</label>
-    <select id="difficulty">
-      <option value="easy">Easy</option>
-      <option value="medium" selected>Medium</option>
-      <option value="hard">Hard</option>
-    </select>
-    <button class="primary" onclick="startGame()">New Game</button>
   </div>
 
   <div class="help">
@@ -576,6 +574,10 @@
   });
   settingsModal.addEventListener('click', (e) => {
     if(e.target === settingsModal) settingsModal.classList.remove('open');
+  });
+  document.getElementById('settingsNewGameBtn').addEventListener('click', () => {
+    settingsModal.classList.remove('open');
+    startGame();
   });
 
   // ---------- STATE ----------
