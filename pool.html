@@ -589,6 +589,12 @@
   let aiGroup = null;
   let firstBreak = true;
   let gameOver = false;
+  let pendingTimer = null; // tracks the one in-flight AI/turn-transition timer, so a reset can cancel it
+
+  function scheduleNext(fn, ms){
+    clearTimeout(pendingTimer);
+    pendingTimer = setTimeout(fn, ms);
+  }
 
   let pottedThisShot = [];
   let cueScratched = false;
@@ -647,6 +653,7 @@
 
   function startGame(){
     // Public entry point: don't rack yet — flip a coin to decide who breaks.
+    clearTimeout(pendingTimer); // cancel any AI/turn timer left over from a game abandoned mid-shot
     state = 'coinflip';
     balls = [];
     gameOver = false;
@@ -729,7 +736,7 @@
     } else {
       setMessage("Computer breaks first...");
       state = 'ai-wait';
-      setTimeout(aiTakeTurn, 900);
+      scheduleNext(aiTakeTurn, 900);
     }
     render();
   }
@@ -1035,7 +1042,7 @@
 
     if(turn==='ai' && !gameOver){
       state = 'ai-wait';
-      setTimeout(aiTakeTurn, 900);
+      scheduleNext(aiTakeTurn, 900);
     } else if(!gameOver){
       state = 'aiming';
     }
@@ -1094,7 +1101,7 @@
     let errorDeg = diff==='easy' ? 9 : diff==='hard' ? 1.2 : 4;
     let powerNoise = diff==='easy' ? 0.22 : diff==='hard' ? 0.05 : 0.12;
 
-    setTimeout(() => {
+    scheduleNext(() => {
       if(gameOver) return;
       if(!shot){
         const target = balls.find(b=>!b.potted && b.type!=='cue');

@@ -283,6 +283,12 @@
   let gameOver = false;
   let flight = null; // in-flight dart animation: {owner,targetDX,targetDY,t0}
   let aimX = 0, aimY = 0; // current aim offset from board center — persists between throws
+  let pendingTimer = null; // tracks the one in-flight AI/turn-transition timer, so a reset can cancel it
+
+  function scheduleNext(fn, ms){
+    clearTimeout(pendingTimer);
+    pendingTimer = setTimeout(fn, ms);
+  }
 
   const canvas = document.getElementById('table');
   const ctx = canvas.getContext('2d');
@@ -305,6 +311,8 @@
   function setMessage(t){ messageEl.textContent = t; }
 
   function startMatch(){
+    clearTimeout(pendingTimer); // cancel any AI/turn timer left over from a game abandoned mid-throw
+    flight = null; // halt any dart animation still running from an abandoned throw
     remaining = { player: 501, ai: 501 };
     gameOver = false;
     overlay.style.display = 'none';
@@ -329,7 +337,7 @@
     } else {
       state = 'ai-wait';
       setMessage("Computer is throwing...");
-      setTimeout(aiThrowDart, 750);
+      scheduleNext(aiThrowDart, 750);
     }
     render();
   }
@@ -463,7 +471,7 @@
       updateScoreDisplays();
       setMessage(`${turn === 'player' ? 'You' : 'Computer'} threw ${result.label} — BUST! Score reverts to ${turnStartRemaining}.`);
       render();
-      setTimeout(() => endTurn(), 1300);
+      scheduleNext(() => endTurn(), 1300);
       return;
     }
 
@@ -474,16 +482,16 @@
 
     if(after === 0){
       setMessage(`${turn === 'player' ? 'You' : 'Computer'} checked out with ${result.label}!`);
-      setTimeout(() => endGame(turn), 900);
+      scheduleNext(() => endGame(turn), 900);
       return;
     }
 
     setMessage(`${turn === 'player' ? 'You' : 'Computer'} threw ${result.label}.`);
 
     if(dartsThisTurn >= 3){
-      setTimeout(() => endTurn(), 900);
+      scheduleNext(() => endTurn(), 900);
     } else if(turn === 'ai'){
-      setTimeout(aiThrowDart, 750);
+      scheduleNext(aiThrowDart, 750);
     } else {
       state = 'aiming'; // player still has darts this turn — ready for the next throw
     }

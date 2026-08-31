@@ -183,6 +183,12 @@
   let state = 'aiming';     // 'aiming' | 'rolling' | 'ai-wait' | 'over'
   let playerScore = 0, aiScore = 0;
   let gameOver = false;
+  let pendingTimer = null;  // tracks the one in-flight AI/turn-transition timer, so a reset can cancel it
+
+  function scheduleNext(fn, ms){
+    clearTimeout(pendingTimer);
+    pendingTimer = setTimeout(fn, ms);
+  }
 
   const canvas = document.getElementById('table');
   const ctx = canvas.getContext('2d');
@@ -215,6 +221,10 @@
   }
 
   function startMatch(){
+    clearTimeout(pendingTimer); // cancel any AI/turn timer left over from a game abandoned mid-shot
+    state = 'aiming'; // halt any physics still stepping from a puck abandoned mid-roll
+    pucks = [];
+    activePuck = null;
     playerScore = 0; aiScore = 0;
     gameOver = false;
     overlay.style.display = 'none';
@@ -248,7 +258,7 @@
     } else {
       state = 'ai-wait';
       setMessage("Computer is lining up a shot...");
-      setTimeout(aiTakeShot, 800);
+      scheduleNext(aiTakeShot, 800);
     }
     render();
   }
@@ -365,7 +375,7 @@
 
     if(shotsThisEnd >= 8){
       setMessage("End complete — tallying score...");
-      setTimeout(resolveEnd, 700);
+      scheduleNext(resolveEnd, 700);
       state = 'ai-wait'; // block input during the pause
     } else {
       beginNextShot();
@@ -400,7 +410,7 @@
 
     setMessage(leader ? `${leader === 'player' ? 'You' : 'Computer'} scored ${leadGain} this end.` : "No one scored that end.");
     startingPlayer = startingPlayer === 'player' ? 'ai' : 'player';
-    setTimeout(startEnd, 1200);
+    scheduleNext(startEnd, 1200);
   }
 
   function endMatch(winner){

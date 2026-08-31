@@ -128,15 +128,17 @@
   const FIELD_W = (LANE_RIGHT - LANE_LEFT) + 20, FIELD_H = CH - 12;
 
   // grass blade texture, generated once so it reads as a stable lawn instead of flickering noise
-  const GRASS_BLADE_COUNT = 130;
+  const GRASS_BLADE_COUNT = 900;
+  const GRASS_COLORS = ['#3a7a2c', '#4d9440', '#5cab4c', '#357024', '#468636', '#63b354'];
   const grassBlades = [];
   for(let i=0; i<GRASS_BLADE_COUNT; i++){
     grassBlades.push({
       x: FIELD_X + Math.random()*FIELD_W,
       y: FIELD_Y + Math.random()*FIELD_H,
-      len: 3 + Math.random()*3,
-      angle: -Math.PI/2 + (Math.random()*0.7 - 0.35),
-      light: Math.random() < 0.5
+      len: 4 + Math.random()*6,
+      lean: (Math.random()*2 - 1) * 5,      // sideways sway of the tip, in px
+      width: 1 + Math.random()*1.3,
+      color: GRASS_COLORS[Math.floor(Math.random()*GRASS_COLORS.length)]
     });
   }
 
@@ -211,6 +213,12 @@
   let gameOver = false;
   let flight = null;          // active toss animation: {owner,startX,startY,targetX,targetY,t0}
   let slide = null;           // active post-landing slide: {owner,x,y,vx,vy,result}
+  let pendingTimer = null;    // tracks the one in-flight AI/turn-transition timer, so a reset can cancel it
+
+  function scheduleNext(fn, ms){
+    clearTimeout(pendingTimer);
+    pendingTimer = setTimeout(fn, ms);
+  }
 
   const canvas = document.getElementById('table');
   const ctx = canvas.getContext('2d');
@@ -236,6 +244,9 @@
   }
 
   function startMatch(){
+    clearTimeout(pendingTimer); // cancel any AI/turn timer left over from a game abandoned mid-throw
+    flight = null; // halt any toss animation still running from an abandoned throw
+    slide = null;  // halt any bag still sliding across the board from an abandoned throw
     playerScore = 0; aiScore = 0;
     gameOver = false;
     overlay.style.display = 'none';
@@ -258,7 +269,7 @@
   function beginNextThrow(){
     if(shotsThisRound >= 8){
       setMessage("Round complete — tallying score...");
-      setTimeout(resolveRound, 700);
+      scheduleNext(resolveRound, 700);
       return;
     }
     turn = whoseShotIndex(shotsThisRound);
@@ -269,7 +280,7 @@
     } else {
       state = 'ai-wait';
       setMessage("Computer is lining up a toss...");
-      setTimeout(aiTakeThrow, 800);
+      scheduleNext(aiTakeThrow, 800);
     }
     render();
   }
@@ -314,7 +325,7 @@
     bags.push({ owner, x, y, result });
     shotsThisRound++;
     setMessage(`${owner === 'player' ? 'You' : 'Computer'}: ${result.label}${result.value>0 ? ' ('+result.value+' pt'+(result.value>1?'s':'')+')' : ''}`);
-    setTimeout(beginNextThrow, 550);
+    scheduleNext(beginNextThrow, 550);
   }
 
   function resolveRound(){
@@ -334,7 +345,7 @@
 
     setMessage(diff>0 ? `${playerTotal>aiTotal?'You':'Computer'} score ${diff} this round.` : "Round tied — no one scores.");
     startingPlayer = startingPlayer === 'player' ? 'ai' : 'player';
-    setTimeout(startRound, 1200);
+    scheduleNext(startRound, 1200);
   }
 
   function endMatch(winner){
@@ -406,16 +417,17 @@
     ctx.fillStyle = wearGrad;
     ctx.fillRect(FIELD_X, FIELD_Y, FIELD_W, FIELD_H);
 
-    // grass blade texture — small stable strokes, not regenerated each frame
-    ctx.strokeStyle = 'rgba(0,0,0,0.16)';
-    ctx.lineWidth = 1;
+    // grass blade texture — dense, tapered blades with real color variation, not regenerated each frame
     grassBlades.forEach(b => {
-      if(b.light) ctx.strokeStyle = 'rgba(255,255,255,0.14)';
-      else ctx.strokeStyle = 'rgba(0,0,0,0.16)';
+      const tipX = b.x + b.lean, tipY = b.y - b.len;
+      const halfW = b.width / 2;
       ctx.beginPath();
-      ctx.moveTo(b.x, b.y);
-      ctx.lineTo(b.x + Math.cos(b.angle)*b.len, b.y + Math.sin(b.angle)*b.len);
-      ctx.stroke();
+      ctx.moveTo(b.x - halfW, b.y);
+      ctx.lineTo(b.x + halfW, b.y);
+      ctx.lineTo(tipX, tipY);
+      ctx.closePath();
+      ctx.fillStyle = b.color;
+      ctx.fill();
     });
 
     ctx.restore();
