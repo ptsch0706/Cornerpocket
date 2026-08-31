@@ -186,9 +186,11 @@
     Left stick sets where you're aiming — it stays put once you let go, so line it up first.
     The right dot bounces on its own, both up-down and side-to-side on different cycles — tap it
     at the moment you want to commit. Dead center and at the top throws true to your aim; off to
-    a side drifts the dart that way, and lower than the top lets gravity drag it down. Standard
-    501: first to exactly 0 wins, but your last dart must land on a double (or the bullseye).
-    Overshoot, land on 1, or reach 0 without a double, and the whole turn is voided.
+    a side drifts the dart that way, and lower than the top lets gravity drag it down. Computer
+    skill (in Settings) controls how fast the dot bounces — easy is slow and forgiving, hard
+    moves quickly. Standard 501: first to exactly 0 wins, but your last dart must land on a
+    double (or the bullseye). Overshoot, land on 1, or reach 0 without a double, and the whole
+    turn is voided.
   </div>
 
 </div>
@@ -346,20 +348,31 @@
   const THROW_DURATION_MS = 380;  // quick flight — darts travel fast
   const LAUNCH_DX = 0, LAUNCH_DY = R * 1.35; // where the throw visually enters the scene, below the board
   const STICK_RADIUS_FRAC = 0.42; // fraction of the stick's own radius the knob can travel
-  const POWER_PERIOD_MS = 950;    // full vertical bounce cycle
-  const DRIFT_PERIOD_MS = 740;    // full horizontal bounce cycle — different period than power on purpose
 
   function canShoot(){
     return turn === 'player' && state === 'aiming' && !gameOver;
   }
 
+  // meter bounce speed scales with difficulty — easy gives plenty of time to time a tap,
+  // hard moves fast enough that hitting dead-center-top on purpose is a real skill
+  function powerPeriodMs(){
+    const diff = difficultySel.value;
+    return diff==='easy' ? 1600 : diff==='hard' ? 650 : 1100;
+  }
+  function driftPeriodMs(){
+    const diff = difficultySel.value;
+    return diff==='easy' ? 1250 : diff==='hard' ? 500 : 850;
+  }
+
   function currentPowerLevel(){
-    const t = (performance.now() % POWER_PERIOD_MS) / POWER_PERIOD_MS;
+    const period = powerPeriodMs();
+    const t = (performance.now() % period) / period;
     return t < 0.5 ? t*2 : 2 - t*2; // 0 -> 1 -> 0, bouncing
   }
 
   function currentDriftLevel(){
-    const t = (performance.now() % DRIFT_PERIOD_MS) / DRIFT_PERIOD_MS;
+    const period = driftPeriodMs();
+    const t = (performance.now() % period) / period;
     return t < 0.5 ? t*2 : 2 - t*2; // 0 -> 1 -> 0, bouncing, on its own independent cycle
   }
 
@@ -523,8 +536,8 @@
   function aiThrowDart(){
     if(gameOver) return;
     const diff = difficultySel.value;
-    const aimJitterPx = diff==='easy' ? 70 : diff==='hard' ? 16 : 40;
-    const underpullMax = diff==='easy' ? 0.65 : diff==='hard' ? 0.10 : 0.35; // how far below full strength the AI might pull
+    const aimJitterPx = diff==='easy' ? 78 : diff==='hard' ? 14 : 52;
+    const underpullMax = diff==='easy' ? 0.70 : diff==='hard' ? 0.08 : 0.42; // how far below full strength the AI might pull
 
     const base = aiTargetFor(remaining.ai);
     const angle = Math.random() * Math.PI * 2;
