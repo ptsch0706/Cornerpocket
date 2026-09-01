@@ -6,6 +6,17 @@
 
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 
+/* Entrance animations for overlays/modals — pop in with a slight scale + fade
+   rather than snapping instantly to visible. */
+@keyframes modalPopIn {
+  from { opacity: 0; transform: scale(0.94) translateY(6px); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes cardPopIn {
+  from { opacity: 0; transform: scale(0.92) translateY(10px); }
+  to { opacity: 1; transform: none; }
+}
+
 html {
   height: 100%;
   height: -webkit-fill-available;
@@ -68,8 +79,9 @@ header h1 {
   background: linear-gradient(180deg, #221e17, #17140f);
   border: 1.5px solid #3a3327;
   cursor: pointer;
+  transition: transform 0.12s ease, filter 0.12s ease;
 }
-.icon-btn:active { transform: translateY(-50%) scale(0.94); }
+.icon-btn:active { transform: translateY(-50%) scale(0.88); filter: brightness(1.18); }
 #menuBtn { left: 0; }
 #settingsBtn { right: 0; }
 
@@ -80,6 +92,7 @@ header h1 {
   top: calc(12px + env(safe-area-inset-top));
   transform: none;
 }
+.icon-btn.fixed-corner:active { transform: scale(0.88); filter: brightness(1.18); }
 .icon-btn.fixed-corner.left { left: calc(14px + env(safe-area-inset-left)); }
 .icon-btn.fixed-corner.right { right: calc(14px + env(safe-area-inset-right)); }
 
@@ -297,8 +310,8 @@ select, button {
   background: linear-gradient(180deg, #221e17, #17140f);
   color: #e9dfcb;
 }
-button { cursor: pointer; }
-button:active { transform: translateY(1px); }
+button { cursor: pointer; transition: transform 0.12s ease, filter 0.12s ease; }
+button:active { transform: scale(0.96); filter: brightness(1.1); }
 button.primary {
   background: linear-gradient(180deg, #e9d9a8, #c9a55c);
   color: #1a160d;
@@ -318,6 +331,7 @@ button.primary {
   flex-direction: column;
   text-align: center;
   padding: 20px;
+  animation: modalPopIn 0.22s ease;
 }
 #overlay h2 { font-family: Georgia, serif; font-size: 24px; color: #e9d9a8; margin-bottom: 6px; letter-spacing: 0.5px; }
 #overlay p { font-size: 13.5px; color: #c9bea8; margin-bottom: 16px; }
@@ -335,7 +349,7 @@ button.primary {
   padding: 24px calc(20px + env(safe-area-inset-right)) calc(24px + env(safe-area-inset-bottom)) calc(20px + env(safe-area-inset-left));
   z-index: 50;
 }
-#coinOverlay.open { display: flex; }
+#coinOverlay.open { display: flex; animation: modalPopIn 0.22s ease; }
 #coinOverlay h2 { font-family: Georgia, serif; font-size: 22px; color: #e9d9a8; margin-bottom: 4px; letter-spacing: 0.5px; }
 #coinOverlay p { font-size: 13px; color: #a89d89; margin: 3px 0; min-height: 16px; }
 .coinStage { perspective: 700px; margin: 20px 0; }
@@ -344,8 +358,9 @@ button.primary {
   position: relative;
   transform-style: preserve-3d;
   cursor: pointer;
-  transition: transform 1.7s cubic-bezier(.18,.66,.32,1);
+  transition: transform 1.7s cubic-bezier(.18,.66,.32,1), filter 0.12s ease;
 }
+.coin:active { filter: brightness(1.18); }
 .coin .face {
   position: absolute;
   inset: 0;
@@ -363,6 +378,28 @@ button.primary {
 .coin .front { background: radial-gradient(circle at 35% 30%, #ecd8a6, #b98f46); color: #1a160d; }
 .coin .back { background: radial-gradient(circle at 35% 30%, #4a4232, #201c15); color: #e9d9a8; transform: rotateY(180deg); }
 .coinResult { font-size: 15.5px !important; font-weight: 700; color: #e9d9a8 !important; }
+.coinDifficulty {
+  display: flex;
+  gap: 8px;
+  margin: 14px 0 4px;
+}
+.diffPill {
+  padding: 8px 14px;
+  min-height: 0;
+  font-size: 12.5px;
+  border-radius: 20px;
+  border: 1.5px solid #3a3327;
+  background: linear-gradient(180deg, #221e17, #17140f);
+  color: #a89d89;
+  transition: transform 0.12s ease, filter 0.12s ease, border-color 0.15s ease, background 0.15s ease, color 0.15s ease;
+}
+.diffPill:active { transform: scale(0.94); }
+.diffPill.active {
+  border-color: #d4af6a;
+  background: linear-gradient(180deg, #e9d9a8, #c9a55c);
+  color: #1a160d;
+  font-weight: 700;
+}
 
 /* ---------- Settings modal ---------- */
 #settingsModal {
@@ -375,7 +412,7 @@ button.primary {
   z-index: 60;
   padding: 20px;
 }
-#settingsModal.open { display: flex; }
+#settingsModal.open { display: flex; animation: modalPopIn 0.18s ease; }
 #settingsModalCard {
   width: 100%;
   max-width: 320px;
@@ -384,6 +421,7 @@ button.primary {
   border-radius: 14px;
   padding: 16px;
   box-shadow: 0 14px 34px rgba(0,0,0,0.6);
+  animation: cardPopIn 0.22s ease;
 }
 .settingsModalHeader {
   display: flex;
@@ -456,9 +494,9 @@ button.primary {
   padding: 16px;
   text-decoration: none;
   color: #efe8da;
-  transition: border-color 0.2s, transform 0.1s;
+  transition: border-color 0.15s ease, transform 0.12s ease, filter 0.12s ease;
 }
-.game-tile:active { transform: scale(0.98); }
+.game-tile:active { transform: scale(0.96); border-color: #d4af6a; filter: brightness(1.06); }
 .game-tile .icon {
   width: 46px; height: 46px;
   flex-shrink: 0;

@@ -171,7 +171,17 @@
   </div>
 
   <div id="coinOverlay">
+    <a class="icon-btn fixed-corner left" href="index.html" aria-label="Back to arcade">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M15 5l-7 7 7 7" stroke="#e9d9a8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    </a>
     <h2>Who Throws First?</h2>
+    <div class="coinDifficulty">
+      <button type="button" class="diffPill" data-diff="easy">Easy</button>
+      <button type="button" class="diffPill" data-diff="medium">Medium</button>
+      <button type="button" class="diffPill" data-diff="hard">Hard</button>
+    </div>
     <p id="coinPrompt">Tap the coin to flip</p>
     <div class="coinStage">
       <div class="coin" id="coin">
@@ -527,6 +537,7 @@
     overlay.style.display = 'flex';
     overlayTitle.textContent = winner === 'player' ? "You Win" : "Computer Wins";
     overlayText.textContent = winner === 'player' ? "Checked out — nicely played." : "The computer checked out first.";
+    Arcade.vibrate(winner === 'player' ? [30, 60, 30, 60, 60] : [40]);
     if(winner === 'player') stats.addWin(); else stats.addLoss();
     renderStats();
     updatePanels();
@@ -741,6 +752,7 @@
 </script>
 <script>
   Arcade.registerServiceWorker();
+  Arcade.wireHaptics();
 </script>
 </body>
 </html>

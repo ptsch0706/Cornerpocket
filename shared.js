@@ -158,6 +158,22 @@ window.Arcade = (function () {
     const startBtn = document.getElementById(startBtnId);
     if (startBtn && startLabel) startBtn.textContent = startLabel;
 
+    // Difficulty pills (optional) — a convenience picker that mirrors whatever
+    // the single #difficulty <select> (in Settings) currently holds, so there's
+    // only ever one source of truth for the value.
+    const difficultySel = document.getElementById('difficulty');
+    const diffPills = overlay.querySelectorAll('.diffPill');
+    function syncDiffPills() {
+      if (!difficultySel) return;
+      diffPills.forEach((p) => p.classList.toggle('active', p.dataset.diff === difficultySel.value));
+    }
+    diffPills.forEach((p) => {
+      p.addEventListener('click', () => {
+        if (difficultySel) difficultySel.value = p.dataset.diff;
+        syncDiffPills();
+      });
+    });
+
     let flipping = false;
     let pendingTurn = null;
 
@@ -169,6 +185,7 @@ window.Arcade = (function () {
       promptEl.textContent = 'Tap the coin to flip';
       resultEl.textContent = '';
       startBtn.style.display = 'none';
+      syncDiffPills();
       overlay.classList.add('open');
       void coinEl.offsetWidth; // force reflow so the next flip transitions cleanly
       coinEl.style.transition = '';
@@ -200,6 +217,25 @@ window.Arcade = (function () {
     return { show };
   }
 
+  /**
+   * Fires a short vibration if the device/browser supports it. Note: iOS Safari
+   * (including installed PWAs) has never implemented the Vibration API, so this
+   * is silently a no-op there — it only does anything on Android. Safe to call
+   * unconditionally either way.
+   */
+  function vibrate(pattern) {
+    if (navigator.vibrate) {
+      try { navigator.vibrate(pattern); } catch (e) {}
+    }
+  }
+
+  /** Wires a light haptic tick to every button/tile/icon-btn press on the page. */
+  function wireHaptics() {
+    document.addEventListener('pointerdown', (e) => {
+      if (e.target.closest('button, .icon-btn, .game-tile, .coin')) vibrate(8);
+    });
+  }
+
   /** Registers the shared service worker and reloads once a new version takes over. */
   function registerServiceWorker() {
     if (!('serviceWorker' in navigator)) return;
@@ -214,5 +250,5 @@ window.Arcade = (function () {
     });
   }
 
-  return { createAimPad, createStats, wireSettingsModal, createCoinFlip, registerServiceWorker };
+  return { createAimPad, createStats, wireSettingsModal, createCoinFlip, vibrate, wireHaptics, registerServiceWorker };
 })();
