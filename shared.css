@@ -244,6 +244,20 @@ header h1 {
   border-radius: 50%;
   border: 1px dashed #4a4232;
 }
+#aimPad::after {
+  content: "";
+  position: absolute;
+  inset: -4px;
+  border-radius: 50%;
+  pointer-events: none;
+  background: conic-gradient(
+    from calc(var(--pull-angle, 0deg) - 20deg),
+    rgba(212,175,106, calc(var(--pull-power, 0) * 0.95)) 0deg,
+    rgba(212,175,106, calc(var(--pull-power, 0) * 0.4)) 20deg,
+    transparent 40deg,
+    transparent 360deg
+  );
+}
 #aimPad.disabled { opacity: 0.3; }
 #aimKnob {
   width: 34%;

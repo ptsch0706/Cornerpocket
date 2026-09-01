@@ -49,6 +49,11 @@ window.Arcade = (function () {
       lastDX = ux; lastDY = uy;
       lastPower = maxR > 0 ? clamped / maxR : 0;
       knobEl.style.transform = `translate(calc(-50% + ${ux * clamped}px), calc(-50% + ${uy * clamped}px))`;
+      if (dist > 0) {
+        const angleDeg = Math.atan2(uy, ux) * 180 / Math.PI + 90; // convert to conic-gradient's convention (0deg = top)
+        padEl.style.setProperty('--pull-angle', angleDeg + 'deg');
+      }
+      padEl.style.setProperty('--pull-power', lastPower);
       if (powerBarEl) powerBarEl.style.width = (lastPower * 100).toFixed(0) + '%';
       if (onMove) onMove(lastDX, lastDY, lastPower);
     }
@@ -69,6 +74,7 @@ window.Arcade = (function () {
       active = false;
       evt.preventDefault();
       knobEl.style.transform = 'translate(-50%,-50%)';
+      padEl.style.setProperty('--pull-power', 0);
       if (powerBarEl) powerBarEl.style.width = '0%';
       if (lastPower > deadzone && onRelease) onRelease(lastDX, lastDY, lastPower);
       lastPower = 0;

@@ -298,6 +298,20 @@
     border-radius: 50%;
     border: 1px dashed #4a4232;
   }
+  #aimPad::after {
+    content: "";
+    position: absolute;
+    inset: -4px;
+    border-radius: 50%;
+    pointer-events: none;
+    background: conic-gradient(
+      from calc(var(--pull-angle, 0deg) - 20deg),
+      rgba(212,175,106, calc(var(--pull-power, 0) * 0.95)) 0deg,
+      rgba(212,175,106, calc(var(--pull-power, 0) * 0.4)) 20deg,
+      transparent 40deg,
+      transparent 360deg
+    );
+  }
   #aimPad.disabled { opacity: 0.3; }
   #aimKnob {
     width: 34%;
@@ -767,6 +781,7 @@
     aimActive = false;
     evt.preventDefault();
     aimKnob.style.transform = 'translate(-50%,-50%)';
+    aimPad.style.setProperty('--pull-power', 0);
     powerBar.style.width = '0%';
     if(aimPower > 0.07){
       // aimDX/aimDY is the pull-back direction (where you dragged the knob);
@@ -789,6 +804,11 @@
     aimDX = ux; aimDY = uy;
     aimPower = maxR > 0 ? clamped/maxR : 0;
     aimKnob.style.transform = `translate(calc(-50% + ${ux*clamped}px), calc(-50% + ${uy*clamped}px))`;
+    if(dist > 0){
+      const angleDeg = Math.atan2(uy, ux) * 180 / Math.PI + 90; // convert to conic-gradient's convention (0deg = top)
+      aimPad.style.setProperty('--pull-angle', angleDeg + 'deg');
+    }
+    aimPad.style.setProperty('--pull-power', aimPower);
     powerBar.style.width = (aimPower*100).toFixed(0) + '%';
     render();
   }
@@ -882,7 +902,7 @@
 
   // ---------- PHYSICS ----------
   const POCKET_GAP_HALF_WIDTH = 26; // cushions don't clamp the ball within this distance of a pocket mouth
-  const RAIL_SAFETY_MARGIN = 42;    // outer fallback bound so a missed pocket can't fly off-canvas forever
+  const RAIL_SAFETY_MARGIN = 18;    // outer fallback bound so a missed pocket can't fly off-canvas forever — kept inside the 28px rail width so the ball never visually leaves the table
 
   function nearPocketGapX(x){
     // relevant to the TOP/BOTTOM cushions, which run along the x-axis

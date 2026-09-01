@@ -53,6 +53,20 @@
     border-radius: 50%;
     border: 1px dashed #4a4232;
   }
+  #aimStick::after {
+    content: "";
+    position: absolute;
+    inset: -4px;
+    border-radius: 50%;
+    pointer-events: none;
+    background: conic-gradient(
+      from calc(var(--pull-angle, 0deg) - 20deg),
+      rgba(212,175,106, calc(var(--pull-power, 0) * 0.95)) 0deg,
+      rgba(212,175,106, calc(var(--pull-power, 0) * 0.4)) 20deg,
+      transparent 40deg,
+      transparent 360deg
+    );
+  }
   #aimStick.disabled { opacity: 0.3; }
   #aimStickKnob {
     width: 34%;
@@ -418,6 +432,11 @@
     const ux = dist > 0 ? dx/dist : 0, uy = dist > 0 ? dy/dist : 0;
     aimStickKnob.style.transform = `translate(calc(-50% + ${ux*clamped}px), calc(-50% + ${uy*clamped}px))`;
     const frac = maxR > 0 ? clamped/maxR : 0;
+    if (dist > 0) {
+      const angleDeg = Math.atan2(uy, ux) * 180 / Math.PI + 90; // convert to conic-gradient's convention (0deg = top)
+      aimStick.style.setProperty('--pull-angle', angleDeg + 'deg');
+    }
+    aimStick.style.setProperty('--pull-power', frac);
     aimX = ux * frac * MAX_OFFSET;
     aimY = uy * frac * MAX_OFFSET;
     render();
